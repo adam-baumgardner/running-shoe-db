@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class='container'>
+    <h1>LIST.HTML</h1>
+    <ul>
+        {% for shoe in all_shoes %}
+            <li>{{shoe.brand}} {{shoe.name}} {{shoe.colorway_set.all}}</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}
