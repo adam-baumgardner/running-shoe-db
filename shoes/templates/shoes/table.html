@@ -2,11 +2,36 @@
 
 {% block content %}
 <div class='container'>
-    <h1>LIST.HTML</h1>
+    <h1>Fast Facts for Popular Running Shoes</h1>
     <ul>
         {% for shoe in all_shoes %}
-            <li>{{shoe.brand}} {{shoe.name}} {{shoe.colorway_set.all}}</li>
+            <!--<li>{{shoe.brand}} {{shoe.name}} {{shoe.colorway_set.all}}</li> -->
+            <li><a href="/shoes/shoe/{{shoe.id}}">{{shoe.brand}} {{shoe.name}}</a></li>
         {% endfor %}
     </ul>
+    <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Shoe</th>
+            <th scope="col">Foam</th>
+            <th scope="col">Weight (oz)</th>
+            <th scope="col">Heel Stack (mm)</th>
+            <th scope="col">Forefoot Stack (mm)</th>
+            <th scope="col">Heel-Toe Drop (mm)</th>
+          </tr>
+        </thead>
+        <tbody>
+            {% for shoe in all_shoes %}
+            <tr>
+                <th scope="row"><a href="/shoes/shoe/{{shoe.id}}">{{shoe.brand}} {{shoe.name}}</a></th>
+                <td>{{shoe.foam}}</td>
+                <td>{{shoe.weight_ounces}}</td>
+                <td>{{shoe.heel_stack_mm}}</td>
+                <td>{{shoe.forefoot_stack_mm}}</td>
+                <td>{{shoe.drop_mm}}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+      </table>
 </div>
 {% endblock %}

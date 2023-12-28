@@ -38,7 +38,7 @@ class Shoe(models.Model):
     stability = models.CharField(max_length=1, choices=STABILITY_LIST, default='n')
 
     def __str__(self):
-        return self.name
+        return f"{self.name}"
 
 
 class Brand(models.Model):
