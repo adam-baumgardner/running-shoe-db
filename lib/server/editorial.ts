@@ -66,6 +66,15 @@ export interface EditorialDashboardData {
     isActive: boolean;
     latestRunStatus: "queued" | "running" | "succeeded" | "partial" | "failed" | null;
   }>;
+  recentCrawlRuns: Array<{
+    id: string;
+    sourceName: string;
+    query: string | null;
+    status: "queued" | "running" | "succeeded" | "partial" | "failed";
+    discoveredCount: number;
+    storedCount: number;
+    errorMessage: string | null;
+  }>;
 }
 
 export async function getEditorialDashboardData(): Promise<EditorialDashboardData> {
@@ -85,6 +94,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       recentReviews: [],
       recentReleases: [],
       crawlSources: [],
+      recentCrawlRuns: [],
     };
   }
 
@@ -103,6 +113,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
     reviewRows,
     recentReleaseRows,
     crawlSourceRows,
+    crawlRunRows,
   ] =
     await Promise.all([
       db.select({ count: count(brands.id) }).from(brands),
@@ -184,6 +195,20 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .innerJoin(reviewSources, eq(crawlSources.reviewSourceId, reviewSources.id))
         .leftJoin(crawlRuns, eq(crawlRuns.crawlSourceId, crawlSources.id))
         .orderBy(reviewSources.name),
+      db
+        .select({
+          id: crawlRuns.id,
+          sourceName: reviewSources.name,
+          query: crawlRuns.query,
+          status: crawlRuns.status,
+          discoveredCount: crawlRuns.discoveredCount,
+          storedCount: crawlRuns.storedCount,
+          errorMessage: crawlRuns.errorMessage,
+        })
+        .from(crawlRuns)
+        .innerJoin(crawlSources, eq(crawlRuns.crawlSourceId, crawlSources.id))
+        .innerJoin(reviewSources, eq(crawlSources.reviewSourceId, reviewSources.id))
+        .orderBy(desc(crawlRuns.createdAt)),
     ]);
 
   return {
@@ -232,6 +257,15 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       cadenceLabel: source.cadenceLabel,
       isActive: source.isActive,
       latestRunStatus: source.latestRunStatus,
+    })),
+    recentCrawlRuns: crawlRunRows.map((run) => ({
+      id: run.id,
+      sourceName: run.sourceName,
+      query: run.query,
+      status: run.status,
+      discoveredCount: run.discoveredCount,
+      storedCount: run.storedCount,
+      errorMessage: run.errorMessage,
     })),
   };
 }

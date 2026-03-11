@@ -20,3 +20,9 @@ export interface IngestionImporterDefinition {
   buildSearchUrl: (query: IngestionQuery) => string;
   normalizeQuery: (query: IngestionQuery) => string;
 }
+
+export interface CrawlExecutionResult {
+  discoveredCount: number;
+  storedCount: number;
+  urls: string[];
+}

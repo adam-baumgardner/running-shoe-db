@@ -214,6 +214,13 @@ a {
   gap: 0.9rem;
 }
 
+.editorial-form-inline {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1.25rem;
+}
+
 .editorial-table-panel {
   margin-top: 1.5rem;
 }
@@ -405,5 +412,10 @@ a {
 
   .editorial-table {
     grid-template-columns: 1fr;
+  }
+
+  .editorial-form-inline {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

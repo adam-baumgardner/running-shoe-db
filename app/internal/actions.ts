@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
+import { runBelieveInTheRunImport } from "@/lib/ingestion/believe-in-the-run-runner";
 import { brands, reviewAuthors, reviews, reviewSources, shoeReleases, shoes, shoeSpecs } from "@/db/schema";
 
 function requireDatabase() {
@@ -256,6 +257,20 @@ export async function updateReviewStatusAction(formData: FormData) {
   }
 
   await db.update(reviews).set({ status }).where(eq(reviews.id, reviewId));
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
+export async function runBelieveInTheRunCrawlAction(formData: FormData) {
+  requireDatabase();
+  const releaseId = String(formData.get("releaseId") ?? "").trim();
+
+  if (!releaseId) {
+    throw new Error("Release is required.");
+  }
+
+  await runBelieveInTheRunImport({ releaseId });
 
   revalidatePath("/internal");
   revalidatePath("/shoes");

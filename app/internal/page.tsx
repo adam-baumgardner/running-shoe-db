@@ -3,6 +3,7 @@ import {
   createManualReviewAction,
   createReviewSourceAction,
   createShoeModelAction,
+  runBelieveInTheRunCrawlAction,
   updateReviewStatusAction,
   upsertReleaseAction,
 } from "@/app/internal/actions";
@@ -319,6 +320,24 @@ export default async function InternalPage() {
       <section className="detail-panel editorial-table-panel">
         <p className="feature-kicker">Ingestion Targets</p>
         <h2>Automated crawl foundation</h2>
+        <form action={runBelieveInTheRunCrawlAction} className="editorial-form editorial-form-inline">
+          <label className="filter-field">
+            <span>Believe in the Run crawl target</span>
+            <select name="releaseId" required defaultValue="">
+              <option value="" disabled>
+                Select release to search
+              </option>
+              {data.releases.map((release) => (
+                <option key={release.id} value={release.id}>
+                  {release.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button className="button-primary" type="submit">
+            Run BITR crawl
+          </button>
+        </form>
         <div className="editorial-table editorial-table--ingestion">
           <div className="editorial-table-head">Source</div>
           <div className="editorial-table-head">Importer</div>
@@ -352,6 +371,33 @@ export default async function InternalPage() {
               </div>
             );
           })}
+        </div>
+      </section>
+
+      <section className="detail-panel editorial-table-panel">
+        <p className="feature-kicker">Recent Crawl Runs</p>
+        <h2>Importer execution history</h2>
+        <div className="editorial-table editorial-table--runs">
+          <div className="editorial-table-head">Source</div>
+          <div className="editorial-table-head">Query</div>
+          <div className="editorial-table-head">Status</div>
+          <div className="editorial-table-head">Discovered</div>
+          <div className="editorial-table-head">Stored</div>
+
+          {data.recentCrawlRuns.map((run) => (
+            <div className="editorial-row" key={run.id}>
+              <div>
+                <strong>{run.sourceName}</strong>
+                {run.errorMessage ? <p className="detail-muted">{run.errorMessage}</p> : null}
+              </div>
+              <div>{run.query ?? "n/a"}</div>
+              <div>
+                <span className="pill">{run.status}</span>
+              </div>
+              <div>{run.discoveredCount}</div>
+              <div>{run.storedCount}</div>
+            </div>
+          ))}
         </div>
       </section>
 
