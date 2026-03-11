@@ -1,6 +1,16 @@
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { brands, crawlRuns, crawlSources, rawDocuments, reviews, reviewSources, shoeReleases, shoes } from "@/db/schema";
+import {
+  brands,
+  crawlRuns,
+  crawlSources,
+  rawDocuments,
+  reviewAuthors,
+  reviews,
+  reviewSources,
+  shoeReleases,
+  shoes,
+} from "@/db/schema";
 import { redditRunningShoeGeeksImporter } from "@/lib/ingestion/reddit-running-shoe-geeks";
 import type { CrawlExecutionResult } from "@/lib/ingestion/types";
 
@@ -15,6 +25,7 @@ interface RedditCandidate {
   authorName: string | undefined;
   score: number | null;
   commentCount: number | null;
+  publishedAt: Date | null;
   rawJson: RedditPost;
 }
 
@@ -98,44 +109,55 @@ export async function runRedditRunningShoeGeeksImport({
 
     let storedCount = 0;
     for (const candidate of candidates) {
+      const enriched = await fetchRedditThread(candidate);
+      const authorId = await getOrCreateReviewAuthor(selected.sourceId, enriched.authorName);
+
       await db
         .insert(rawDocuments)
         .values({
           crawlRunId,
-          sourceUrl: candidate.sourceUrl,
+          sourceUrl: enriched.sourceUrl,
           contentType: "application/json",
-          title: candidate.title,
-          excerpt: candidate.excerpt ?? null,
-          rawText: JSON.stringify(candidate.rawJson).slice(0, 12000),
+          title: enriched.title,
+          excerpt: enriched.summary,
+          rawText: JSON.stringify(enriched.rawJson).slice(0, 12000),
           metadata: {
             importer: redditRunningShoeGeeksImporter.key,
             query,
-            authorName: candidate.authorName,
-            comments: candidate.commentCount,
-            score: candidate.score,
+            authorName: enriched.authorName,
+            comments: enriched.commentCount,
+            score: enriched.score,
+            threadSummary: enriched.summary,
+            topComments: enriched.topComments,
+            sentiment: enriched.sentiment,
           },
         })
         .onConflictDoNothing();
 
       const existingReview = await db.query.reviews.findFirst({
-        where: eq(reviews.sourceUrl, candidate.sourceUrl),
+        where: eq(reviews.sourceUrl, enriched.sourceUrl),
       });
 
       if (!existingReview) {
         await db.insert(reviews).values({
           releaseId: selected.releaseId,
           sourceId: selected.sourceId,
-          sourceUrl: candidate.sourceUrl,
-          title: candidate.title,
-          excerpt: candidate.excerpt ?? null,
+          authorId,
+          sourceUrl: enriched.sourceUrl,
+          title: enriched.title,
+          excerpt: enriched.summary,
+          body: enriched.body,
+          sentiment: enriched.sentiment,
           status: "pending",
+          publishedAt: enriched.publishedAt,
           metadata: {
             crawlRunId,
             importer: redditRunningShoeGeeksImporter.key,
             query,
-            authorName: candidate.authorName,
-            comments: candidate.commentCount,
-            score: candidate.score,
+            authorName: enriched.authorName,
+            comments: enriched.commentCount,
+            score: enriched.score,
+            topComments: enriched.topComments,
           },
         });
         storedCount += 1;
@@ -240,6 +262,7 @@ function extractRedditCandidates(
       authorName: post.author ?? undefined,
       score: typeof post.score === "number" ? post.score : null,
       commentCount: typeof post.num_comments === "number" ? post.num_comments : null,
+      publishedAt: unixToDate(post.created_utc),
       rawJson: post,
     }))
     .slice(0, 20);
@@ -257,6 +280,7 @@ function extractRedditCandidates(
       authorName: post.authorName,
       score: post.score,
       commentCount: post.commentCount,
+      publishedAt: post.publishedAt,
       rawJson: post.rawJson,
     });
   }
@@ -274,8 +298,202 @@ function normalizeRedditUrl(permalink: string | undefined) {
   }
 }
 
+async function fetchRedditThread(candidate: RedditCandidate) {
+  const response = await fetch(buildRedditThreadJsonUrl(candidate.sourceUrl), {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; StrideStackBot/0.1; +https://stride-stack.vercel.app)",
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    return enrichFallbackCandidate(candidate);
+  }
+
+  const payload = (await response.json()) as RedditThreadResponse;
+  const threadCandidate = payload[0]?.data?.children?.[0]?.data;
+  const thread = isRedditPost(threadCandidate) ? threadCandidate : null;
+  if (!thread) {
+    return enrichFallbackCandidate(candidate);
+  }
+
+  const topComments = (payload[1]?.data?.children ?? [])
+    .map((child) => child.data)
+    .filter(isRedditComment)
+    .filter((comment) => Boolean(comment.body))
+    .filter((comment) => !comment.stickied)
+    .sort((left, right) => (right.score ?? 0) - (left.score ?? 0))
+    .slice(0, 3)
+    .map((comment) => ({
+      authorName: comment.author ?? "unknown",
+      score: comment.score ?? null,
+      body: cleanText(comment.body ?? "").slice(0, 280),
+    }))
+    .filter((comment) => comment.body.length > 0);
+
+  const summary = buildThreadSummary({
+    excerpt: candidate.excerpt,
+    body: thread.selftext ?? "",
+    topComments: topComments.map((comment) => comment.body),
+  });
+  const body = buildThreadBody({
+    title: candidate.title,
+    selfText: thread.selftext ?? "",
+    topComments,
+  });
+
+  return {
+    sourceUrl: candidate.sourceUrl,
+    title: cleanText(thread.title ?? candidate.title),
+    authorName: thread.author ?? candidate.authorName,
+    score: typeof thread.score === "number" ? thread.score : candidate.score,
+    commentCount:
+      typeof thread.num_comments === "number" ? thread.num_comments : candidate.commentCount,
+    publishedAt: unixToDate(thread.created_utc) ?? candidate.publishedAt,
+    summary,
+    body,
+    sentiment: deriveSentiment(summary, topComments.map((comment) => comment.body)),
+    topComments,
+    rawJson: payload,
+  };
+}
+
+function enrichFallbackCandidate(candidate: RedditCandidate) {
+  const summary = candidate.excerpt || candidate.title;
+
+  return {
+    sourceUrl: candidate.sourceUrl,
+    title: candidate.title,
+    authorName: candidate.authorName,
+    score: candidate.score,
+    commentCount: candidate.commentCount,
+    publishedAt: candidate.publishedAt,
+    summary,
+    body: summary,
+    sentiment: deriveSentiment(summary, []),
+    topComments: [],
+    rawJson: candidate.rawJson,
+  };
+}
+
+async function getOrCreateReviewAuthor(sourceId: string, authorName: string | undefined) {
+  if (!authorName) {
+    return null;
+  }
+
+  const db = getDb();
+  const existing = await db.query.reviewAuthors.findFirst({
+    where: and(eq(reviewAuthors.sourceId, sourceId), eq(reviewAuthors.displayName, authorName)),
+  });
+
+  if (existing) {
+    return existing.id;
+  }
+
+  const inserted = await db
+    .insert(reviewAuthors)
+    .values({
+      sourceId,
+      displayName: authorName,
+      profileUrl: `https://www.reddit.com/user/${encodeURIComponent(authorName)}/`,
+    })
+    .returning({ id: reviewAuthors.id });
+
+  return inserted[0]?.id ?? null;
+}
+
+function buildRedditThreadJsonUrl(sourceUrl: string) {
+  return `${sourceUrl.replace(/\/$/, "")}.json?limit=8&depth=1&sort=top`;
+}
+
+function buildThreadSummary({
+  excerpt,
+  body,
+  topComments,
+}: {
+  excerpt: string;
+  body: string;
+  topComments: string[];
+}) {
+  const parts = [cleanText(body), excerpt, ...topComments.map(cleanText)].filter((part) => part.length > 0);
+  return parts.join(" ").slice(0, 420).trim();
+}
+
+function buildThreadBody({
+  title,
+  selfText,
+  topComments,
+}: {
+  title: string;
+  selfText: string;
+  topComments: Array<{ authorName: string; score: number | null; body: string }>;
+}) {
+  const segments = [title];
+
+  if (cleanText(selfText)) {
+    segments.push(cleanText(selfText));
+  }
+
+  for (const comment of topComments) {
+    segments.push(`Top comment by ${comment.authorName}: ${comment.body}`);
+  }
+
+  return segments.join("\n\n").slice(0, 4000);
+}
+
+function deriveSentiment(summary: string, topComments: string[]) {
+  const haystack = normalizeSearchText([summary, ...topComments].join(" "));
+  const positiveSignals = [
+    "love",
+    "great",
+    "excellent",
+    "favorite",
+    "fast",
+    "smooth",
+    "comfortable",
+    "fun",
+    "impressive",
+    "stable",
+  ];
+  const negativeSignals = [
+    "bad",
+    "harsh",
+    "firm",
+    "unstable",
+    "disappointing",
+    "hate",
+    "issue",
+    "problem",
+    "blister",
+    "pain",
+  ];
+
+  const positiveCount = positiveSignals.filter((signal) => haystack.includes(signal)).length;
+  const negativeCount = negativeSignals.filter((signal) => haystack.includes(signal)).length;
+
+  if (positiveCount >= negativeCount + 2) {
+    return "positive" as const;
+  }
+
+  if (negativeCount >= positiveCount + 2) {
+    return "negative" as const;
+  }
+
+  return "mixed" as const;
+}
+
 function cleanText(value: string) {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function unixToDate(value: number | undefined) {
+  if (typeof value !== "number") {
+    return null;
+  }
+
+  return new Date(value * 1000);
 }
 
 function normalizeSearchText(value: string) {
@@ -324,4 +542,38 @@ interface RedditPost {
   author?: string;
   score?: number;
   num_comments?: number;
+  created_utc?: number;
+}
+
+type RedditThreadResponse = RedditThreadListing[];
+
+interface RedditThreadListing {
+  data?: {
+    children?: Array<{
+      data: RedditPost | RedditComment;
+    }>;
+  };
+}
+
+interface RedditComment {
+  body?: string;
+  author?: string;
+  score?: number;
+  stickied?: boolean;
+}
+
+function isRedditPost(value: RedditPost | RedditComment | undefined): value is RedditPost {
+  if (!value) {
+    return false;
+  }
+
+  return "title" in value || "selftext" in value || "permalink" in value;
+}
+
+function isRedditComment(value: RedditPost | RedditComment | undefined): value is RedditComment {
+  if (!value) {
+    return false;
+  }
+
+  return "body" in value || "stickied" in value;
 }
