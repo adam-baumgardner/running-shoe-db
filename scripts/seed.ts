@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { closeDbConnection, getDb } from "../db";
 import {
   seedBrands,
+  seedCrawlSources,
   seedReleases,
   seedReviewAuthors,
   seedReviews,
@@ -12,6 +13,7 @@ import {
 } from "../db/seed-data";
 import {
   brands,
+  crawlSources,
   reviewAuthors,
   reviews,
   reviewSources,
@@ -146,6 +148,31 @@ async function main() {
 
   const sourceRows = await db.select().from(reviewSources);
   const sourceIdBySlug = new Map(sourceRows.map((source) => [source.slug, source.id]));
+
+  for (const crawlSource of seedCrawlSources) {
+    const reviewSourceId = sourceIdBySlug.get(crawlSource.reviewSourceSlug);
+    if (!reviewSourceId) throw new Error(`Missing review source for crawl target ${crawlSource.importerKey}`);
+
+    await db.insert(crawlSources).values({
+      reviewSourceId,
+      importerKey: crawlSource.importerKey,
+      targetType: crawlSource.targetType,
+      targetUrl: crawlSource.targetUrl,
+      searchPattern: crawlSource.searchPattern,
+      cadenceLabel: crawlSource.cadenceLabel,
+      notes: crawlSource.notes,
+    }).onConflictDoUpdate({
+      target: [crawlSources.importerKey, crawlSources.targetUrl],
+      set: {
+        reviewSourceId,
+        targetType: crawlSource.targetType,
+        searchPattern: crawlSource.searchPattern,
+        cadenceLabel: crawlSource.cadenceLabel,
+        notes: crawlSource.notes,
+        isActive: true,
+      },
+    });
+  }
 
   for (const author of seedReviewAuthors) {
     const sourceId = sourceIdBySlug.get(author.sourceSlug);

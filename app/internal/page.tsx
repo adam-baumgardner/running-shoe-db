@@ -6,6 +6,7 @@ import {
   updateReviewStatusAction,
   upsertReleaseAction,
 } from "@/app/internal/actions";
+import { getImporterByKey } from "@/lib/ingestion";
 import { getEditorialDashboardData } from "@/lib/server/editorial";
 
 export const dynamic = "force-dynamic";
@@ -313,6 +314,45 @@ export default async function InternalPage() {
             </button>
           </form>
         </article>
+      </section>
+
+      <section className="detail-panel editorial-table-panel">
+        <p className="feature-kicker">Ingestion Targets</p>
+        <h2>Automated crawl foundation</h2>
+        <div className="editorial-table editorial-table--ingestion">
+          <div className="editorial-table-head">Source</div>
+          <div className="editorial-table-head">Importer</div>
+          <div className="editorial-table-head">Target</div>
+          <div className="editorial-table-head">Cadence</div>
+          <div className="editorial-table-head">Latest run</div>
+
+          {data.crawlSources.map((source) => {
+            const importer = getImporterByKey(source.importerKey);
+
+            return (
+              <div className="editorial-row" key={source.id}>
+                <div>
+                  <strong>{source.sourceName}</strong>
+                  <p className="detail-muted">{source.targetType}</p>
+                </div>
+                <div>
+                  <strong>{importer?.label ?? source.importerKey}</strong>
+                  <p className="detail-muted">{importer?.description ?? "Importer pending."}</p>
+                </div>
+                <div>
+                  <a className="text-link" href={source.targetUrl} rel="noreferrer" target="_blank">
+                    Open target
+                  </a>
+                  <p className="detail-muted">Search pattern: {source.searchPattern ?? "None"}</p>
+                </div>
+                <div>{source.cadenceLabel ?? "Unset"}</div>
+                <div>
+                  <span className="pill">{source.latestRunStatus ?? "never-run"}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <section className="detail-panel editorial-table-panel">

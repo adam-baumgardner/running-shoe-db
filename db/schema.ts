@@ -42,6 +42,14 @@ export const reviewStatusEnum = pgEnum("review_status", [
 ]);
 
 export const sentimentEnum = pgEnum("sentiment", ["positive", "mixed", "negative"]);
+export const crawlTargetTypeEnum = pgEnum("crawl_target_type", ["search", "listing", "api"]);
+export const crawlRunStatusEnum = pgEnum("crawl_run_status", [
+  "queued",
+  "running",
+  "succeeded",
+  "partial",
+  "failed",
+]);
 
 export const brands = pgTable(
   "brands",
@@ -203,5 +211,72 @@ export const reviewTagAssignments = pgTable(
   },
   (table) => [
     primaryKey({ columns: [table.reviewId, table.tagId], name: "review_tag_assignments_pk" }),
+  ]
+);
+
+export const crawlSources = pgTable(
+  "crawl_sources",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    reviewSourceId: uuid("review_source_id")
+      .notNull()
+      .references(() => reviewSources.id, { onDelete: "cascade" }),
+    importerKey: varchar("importer_key", { length: 120 }).notNull(),
+    targetType: crawlTargetTypeEnum("target_type").notNull(),
+    targetUrl: text("target_url").notNull(),
+    searchPattern: varchar("search_pattern", { length: 240 }),
+    cadenceLabel: varchar("cadence_label", { length: 80 }),
+    isActive: boolean("is_active").default(true).notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("crawl_sources_review_source_idx").on(table.reviewSourceId),
+    uniqueIndex("crawl_sources_importer_target_idx").on(table.importerKey, table.targetUrl),
+  ]
+);
+
+export const crawlRuns = pgTable(
+  "crawl_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    crawlSourceId: uuid("crawl_source_id")
+      .notNull()
+      .references(() => crawlSources.id, { onDelete: "cascade" }),
+    status: crawlRunStatusEnum("status").default("queued").notNull(),
+    query: varchar("query", { length: 240 }),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    discoveredCount: integer("discovered_count").default(0).notNull(),
+    storedCount: integer("stored_count").default(0).notNull(),
+    errorMessage: text("error_message"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("crawl_runs_source_idx").on(table.crawlSourceId),
+    index("crawl_runs_status_idx").on(table.status),
+  ]
+);
+
+export const rawDocuments = pgTable(
+  "raw_documents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    crawlRunId: uuid("crawl_run_id")
+      .notNull()
+      .references(() => crawlRuns.id, { onDelete: "cascade" }),
+    sourceUrl: text("source_url").notNull(),
+    contentType: varchar("content_type", { length: 120 }),
+    title: varchar("title", { length: 240 }),
+    excerpt: text("excerpt"),
+    rawText: text("raw_text"),
+    metadata: jsonb("metadata"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("raw_documents_run_idx").on(table.crawlRunId),
+    uniqueIndex("raw_documents_run_source_idx").on(table.crawlRunId, table.sourceUrl),
   ]
 );

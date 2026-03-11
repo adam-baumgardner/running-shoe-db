@@ -76,6 +76,16 @@ export interface SeedReview {
   publishedAt: string;
 }
 
+export interface SeedCrawlSource {
+  reviewSourceSlug: string;
+  importerKey: string;
+  targetType: "search" | "listing" | "api";
+  targetUrl: string;
+  searchPattern: string;
+  cadenceLabel: string;
+  notes: string;
+}
+
 export const seedBrands: SeedBrand[] = [
   { name: "Nike", slug: "nike", websiteUrl: "https://www.nike.com" },
   { name: "Saucony", slug: "saucony", websiteUrl: "https://www.saucony.com" },
@@ -259,5 +269,26 @@ export const seedReviews: SeedReview[] = [
     sentiment: "mixed",
     status: "approved",
     publishedAt: "2024-04-18T00:00:00.000Z",
+  },
+];
+
+export const seedCrawlSources: SeedCrawlSource[] = [
+  {
+    reviewSourceSlug: "believe-in-the-run",
+    importerKey: "believe-in-the-run",
+    targetType: "search",
+    targetUrl: "https://believeintherun.com/",
+    searchPattern: "{shoe_name}",
+    cadenceLabel: "daily",
+    notes: "Search site content for shoe model names and capture matching editorial reviews.",
+  },
+  {
+    reviewSourceSlug: "reddit-running-shoe-geeks",
+    importerKey: "reddit-running-shoe-geeks",
+    targetType: "search",
+    targetUrl: "https://www.reddit.com/r/RunningShoeGeeks/",
+    searchPattern: "{shoe_name}",
+    cadenceLabel: "twice-daily",
+    notes: "Search subreddit threads and comments for shoe model sentiment and review discussions.",
   },
 ];

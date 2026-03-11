@@ -1,6 +1,6 @@
 import { count, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { brands, reviewSources, reviews, shoeReleases, shoes, shoeSpecs } from "@/db/schema";
+import { brands, crawlRuns, crawlSources, reviewSources, reviews, shoeReleases, shoes, shoeSpecs } from "@/db/schema";
 
 export interface EditorialBrandOption {
   id: string;
@@ -55,6 +55,17 @@ export interface EditorialDashboardData {
     weightOzMen: number | null;
     dropMm: number | null;
   }>;
+  crawlSources: Array<{
+    id: string;
+    importerKey: string;
+    sourceName: string;
+    targetType: "search" | "listing" | "api";
+    targetUrl: string;
+    searchPattern: string | null;
+    cadenceLabel: string | null;
+    isActive: boolean;
+    latestRunStatus: "queued" | "running" | "succeeded" | "partial" | "failed" | null;
+  }>;
 }
 
 export async function getEditorialDashboardData(): Promise<EditorialDashboardData> {
@@ -73,6 +84,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       sources: [],
       recentReviews: [],
       recentReleases: [],
+      crawlSources: [],
     };
   }
 
@@ -90,6 +102,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
     sourceRows,
     reviewRows,
     recentReleaseRows,
+    crawlSourceRows,
   ] =
     await Promise.all([
       db.select({ count: count(brands.id) }).from(brands),
@@ -155,6 +168,22 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
         .leftJoin(shoeSpecs, eq(shoeSpecs.releaseId, shoeReleases.id))
         .orderBy(desc(shoeReleases.releaseYear), shoes.name),
+      db
+        .select({
+          id: crawlSources.id,
+          importerKey: crawlSources.importerKey,
+          sourceName: reviewSources.name,
+          targetType: crawlSources.targetType,
+          targetUrl: crawlSources.targetUrl,
+          searchPattern: crawlSources.searchPattern,
+          cadenceLabel: crawlSources.cadenceLabel,
+          isActive: crawlSources.isActive,
+          latestRunStatus: crawlRuns.status,
+        })
+        .from(crawlSources)
+        .innerJoin(reviewSources, eq(crawlSources.reviewSourceId, reviewSources.id))
+        .leftJoin(crawlRuns, eq(crawlRuns.crawlSourceId, crawlSources.id))
+        .orderBy(reviewSources.name),
     ]);
 
   return {
@@ -192,6 +221,17 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       msrpUsd: release.msrpUsd ? Number(release.msrpUsd) : null,
       weightOzMen: release.weightOzMen ? Number(release.weightOzMen) : null,
       dropMm: release.dropMm,
+    })),
+    crawlSources: crawlSourceRows.map((source) => ({
+      id: source.id,
+      importerKey: source.importerKey,
+      sourceName: source.sourceName,
+      targetType: source.targetType,
+      targetUrl: source.targetUrl,
+      searchPattern: source.searchPattern,
+      cadenceLabel: source.cadenceLabel,
+      isActive: source.isActive,
+      latestRunStatus: source.latestRunStatus,
     })),
   };
 }
