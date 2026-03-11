@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { reviewAuthors, reviews, reviewSources } from "@/db/schema";
+import { brands, reviewAuthors, reviews, reviewSources, shoeReleases, shoes, shoeSpecs } from "@/db/schema";
 
 function requireDatabase() {
   if (!process.env.DATABASE_URL) {
@@ -34,6 +34,160 @@ export async function createReviewSourceAction(formData: FormData) {
   });
 
   revalidatePath("/internal");
+}
+
+export async function createBrandAction(formData: FormData) {
+  const db = requireDatabase();
+  const name = String(formData.get("name") ?? "").trim();
+  const rawSlug = String(formData.get("slug") ?? "").trim();
+  const websiteUrl = String(formData.get("websiteUrl") ?? "").trim();
+
+  if (!name) {
+    throw new Error("Brand name is required.");
+  }
+
+  const slug = rawSlug || slugify(name);
+
+  await db.insert(brands).values({
+    name,
+    slug,
+    websiteUrl: websiteUrl || null,
+  });
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
+export async function createShoeModelAction(formData: FormData) {
+  const db = requireDatabase();
+  const brandId = String(formData.get("brandId") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const rawSlug = String(formData.get("slug") ?? "").trim();
+  const category = String(formData.get("category") ?? "").trim() as
+    | "road-daily"
+    | "road-workout"
+    | "road-race"
+    | "trail-daily"
+    | "trail-race"
+    | "track-spikes"
+    | "hiking-fastpack";
+  const terrain = String(formData.get("terrain") ?? "").trim() as "road" | "trail" | "track" | "mixed";
+  const stability = String(formData.get("stability") ?? "").trim() as "neutral" | "stability";
+  const usageSummary = String(formData.get("usageSummary") ?? "").trim();
+
+  if (!brandId || !name || !category || !terrain || !stability) {
+    throw new Error("Missing required shoe fields.");
+  }
+
+  const slug = rawSlug || slugify(name);
+
+  await db.insert(shoes).values({
+    brandId,
+    name,
+    slug,
+    category,
+    terrain,
+    stability,
+    usageSummary: usageSummary || null,
+  });
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
+export async function upsertReleaseAction(formData: FormData) {
+  const db = requireDatabase();
+  const shoeId = String(formData.get("shoeId") ?? "").trim();
+  const versionName = String(formData.get("versionName") ?? "").trim();
+  const releaseYearRaw = String(formData.get("releaseYear") ?? "").trim();
+  const msrpUsd = String(formData.get("msrpUsd") ?? "").trim();
+  const isCurrent = formData.get("isCurrent") === "on";
+  const isPlated = formData.get("isPlated") === "on";
+  const foam = String(formData.get("foam") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  const weightOzMen = String(formData.get("weightOzMen") ?? "").trim();
+  const heelStackMmRaw = String(formData.get("heelStackMm") ?? "").trim();
+  const forefootStackMmRaw = String(formData.get("forefootStackMm") ?? "").trim();
+  const dropMmRaw = String(formData.get("dropMm") ?? "").trim();
+  const fitNotes = String(formData.get("fitNotes") ?? "").trim();
+  const sourceNotes = String(formData.get("sourceNotes") ?? "").trim();
+
+  if (!shoeId || !versionName) {
+    throw new Error("Shoe and version name are required.");
+  }
+
+  const inserted = await db
+    .insert(shoeReleases)
+    .values({
+      shoeId,
+      versionName,
+      releaseYear: releaseYearRaw ? Number(releaseYearRaw) : null,
+      msrpUsd: msrpUsd || null,
+      isCurrent,
+      isPlated,
+      foam: foam || null,
+      notes: notes || null,
+    })
+    .onConflictDoUpdate({
+      target: [shoeReleases.shoeId, shoeReleases.versionName],
+      set: {
+        releaseYear: releaseYearRaw ? Number(releaseYearRaw) : null,
+        msrpUsd: msrpUsd || null,
+        isCurrent,
+        isPlated,
+        foam: foam || null,
+        notes: notes || null,
+      },
+    })
+    .returning({ id: shoeReleases.id });
+
+  const releaseId = inserted[0]?.id;
+  if (!releaseId) {
+    const existing = await db.query.shoeReleases.findFirst({
+      where: and(eq(shoeReleases.shoeId, shoeId), eq(shoeReleases.versionName, versionName)),
+    });
+
+    if (!existing) {
+      throw new Error("Unable to resolve release after upsert.");
+    }
+  }
+
+  const resolvedReleaseId = releaseId
+    ? releaseId
+    : (
+        await db.query.shoeReleases.findFirst({
+          where: and(eq(shoeReleases.shoeId, shoeId), eq(shoeReleases.versionName, versionName)),
+        })
+      )?.id;
+
+  if (!resolvedReleaseId) {
+    throw new Error("Unable to resolve release id.");
+  }
+
+  const existingSpec = await db.query.shoeSpecs.findFirst({
+    where: eq(shoeSpecs.releaseId, resolvedReleaseId),
+  });
+
+  const specValues = {
+    weightOzMen: weightOzMen || null,
+    heelStackMm: heelStackMmRaw ? Number(heelStackMmRaw) : null,
+    forefootStackMm: forefootStackMmRaw ? Number(forefootStackMmRaw) : null,
+    dropMm: dropMmRaw ? Number(dropMmRaw) : null,
+    fitNotes: fitNotes || null,
+    sourceNotes: sourceNotes || null,
+  };
+
+  if (existingSpec) {
+    await db.update(shoeSpecs).set(specValues).where(eq(shoeSpecs.releaseId, resolvedReleaseId));
+  } else {
+    await db.insert(shoeSpecs).values({
+      releaseId: resolvedReleaseId,
+      ...specValues,
+    });
+  }
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
 }
 
 export async function createManualReviewAction(formData: FormData) {
@@ -105,4 +259,12 @@ export async function updateReviewStatusAction(formData: FormData) {
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
+}
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
