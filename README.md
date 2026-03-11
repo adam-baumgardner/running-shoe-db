@@ -21,3 +21,12 @@ This app is being rebuilt as a consumer-facing running shoe comparison and refer
 ## Current status
 
 This repository is in foundation phase. The Django prototype has been replaced with a new frontend baseline and the data layer will be added next.
+
+## Internal tooling access
+
+The `/internal` route is protected with HTTP Basic Auth driven by:
+
+- `INTERNAL_BASIC_AUTH_USERNAME`
+- `INTERNAL_BASIC_AUTH_PASSWORD`
+
+In local development, the route remains open if those variables are unset. In production, the route should always have both values configured.
