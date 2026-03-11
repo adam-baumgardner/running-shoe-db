@@ -1,6 +1,8 @@
-import { shoes } from "@/lib/data";
+import { getCatalogCards } from "@/lib/server/catalog";
 
-export default function ShoesPage() {
+export default async function ShoesPage() {
+  const shoes = await getCatalogCards();
+
   return (
     <main className="page-shell">
       <section className="hero">
@@ -16,14 +18,18 @@ export default function ShoesPage() {
 
       <section className="section-grid" aria-label="Seed catalog">
         {shoes.map((shoe) => (
-          <article key={`${shoe.brand}-${shoe.name}`} className="feature-panel">
+          <article key={shoe.id} className="feature-panel">
             <p className="feature-kicker">{shoe.category}</p>
             <h2>
-              {shoe.brand} {shoe.name}
+              {shoe.brand} {shoe.release}
             </h2>
             <p>
-              {shoe.rideProfile}. {shoe.weightOz} oz, {shoe.dropMm} mm drop.
+              {shoe.rideProfile}.{" "}
+              {shoe.weightOz ? `${shoe.weightOz} oz` : "Weight pending"},{" "}
+              {shoe.dropMm ? `${shoe.dropMm} mm drop` : "drop pending"}.
             </p>
+            <p>{shoe.usageSummary ?? "Usage summary pending."}</p>
+            <p>{shoe.reviewCount} approved reviews indexed.</p>
           </article>
         ))}
       </section>
