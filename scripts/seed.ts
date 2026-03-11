@@ -1,7 +1,10 @@
+import { config } from "dotenv";
 import { eq } from "drizzle-orm";
-import { getDb } from "../db";
+import { closeDbConnection, getDb } from "../db";
 import { seedBrands, seedReleases, seedReviewSources, seedShoes, seedSpecs } from "../db/seed-data";
 import { brands, reviewSources, shoeReleases, shoes, shoeSpecs } from "../db/schema";
+
+config({ path: ".env.local" });
 
 async function main() {
   const db = getDb();
@@ -126,6 +129,7 @@ async function main() {
   }
 
   console.log("Seed completed.");
+  await closeDbConnection();
 }
 
 main().catch((error) => {
