@@ -1,7 +1,20 @@
-import { getCatalogCards } from "@/lib/server/catalog";
+import { CatalogFilterBar } from "@/components/catalog-filter-bar";
+import { ShoeCard } from "@/components/shoe-card";
+import { getCatalogPageData } from "@/lib/server/catalog";
 
-export default async function ShoesPage() {
-  const shoes = await getCatalogCards();
+interface ShoesPageProps {
+  searchParams: Promise<{
+    q?: string;
+    category?: string;
+    terrain?: string;
+    stability?: string;
+    plated?: string;
+  }>;
+}
+
+export default async function ShoesPage({ searchParams }: ShoesPageProps) {
+  const filters = await searchParams;
+  const { shoes, filterOptions } = await getCatalogPageData(filters);
 
   return (
     <main className="page-shell">
@@ -10,27 +23,21 @@ export default async function ShoesPage() {
           <p className="eyebrow">Catalog</p>
           <h1>Filterable shoes built around buying signals.</h1>
           <p className="hero-copy">
-            This section will become the core browse experience: specs, categories, review
-            summaries, and comparison entry points.
+            Search by use case first, then narrow by ride profile, stability, terrain, and plate
+            status. This is the first pass at the research workflow.
           </p>
         </div>
       </section>
 
-      <section className="section-grid" aria-label="Seed catalog">
+      <CatalogFilterBar filters={filters} options={filterOptions} />
+
+      <section className="catalog-meta">
+        <p>{shoes.length} shoes match the current filters.</p>
+      </section>
+
+      <section className="catalog-grid" aria-label="Catalog results">
         {shoes.map((shoe) => (
-          <article key={shoe.id} className="feature-panel">
-            <p className="feature-kicker">{shoe.category}</p>
-            <h2>
-              {shoe.brand} {shoe.release}
-            </h2>
-            <p>
-              {shoe.rideProfile}.{" "}
-              {shoe.weightOz ? `${shoe.weightOz} oz` : "Weight pending"},{" "}
-              {shoe.dropMm ? `${shoe.dropMm} mm drop` : "drop pending"}.
-            </p>
-            <p>{shoe.usageSummary ?? "Usage summary pending."}</p>
-            <p>{shoe.reviewCount} approved reviews indexed.</p>
-          </article>
+          <ShoeCard key={shoe.id} shoe={shoe} />
         ))}
       </section>
     </main>
