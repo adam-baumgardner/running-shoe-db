@@ -37,9 +37,14 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
           <dd>{shoe.reviewCount}</dd>
         </div>
       </dl>
-      <Link className="text-link" href={`/shoes/${shoe.slug}`}>
-        Open shoe detail
-      </Link>
+      <div className="card-actions">
+        <Link className="text-link" href={`/shoes/${shoe.slug}`}>
+          Open shoe detail
+        </Link>
+        <Link className="text-link" href={`/compare?shoe=${shoe.slug}`}>
+          Compare this shoe
+        </Link>
+      </div>
     </article>
   );
 }

@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { getShoeDetail } from "@/lib/server/catalog";
 
 interface ShoeDetailPageProps {
@@ -49,6 +50,10 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
               <dt>Drop</dt>
               <dd>{shoe.dropMm ? `${shoe.dropMm} mm` : "Pending"}</dd>
             </div>
+            <div>
+              <dt>Avg review</dt>
+              <dd>{shoe.averageReviewScore ? `${Math.round(shoe.averageReviewScore)}/100` : "Pending"}</dd>
+            </div>
           </dl>
         </aside>
       </section>
@@ -86,11 +91,40 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
 
         <article className="detail-panel">
           <p className="feature-kicker">Reviews</p>
-          <h2>Review system baseline</h2>
+          <h2>Source-backed review signals</h2>
           <p>
-            {shoe.reviewCount} approved reviews are currently indexed for this release. The next
-            increment will expose the underlying source list and normalized review sentiment.
+            {shoe.reviewCount} approved reviews are currently indexed for this release.
+            {shoe.averageReviewScore ? ` Average normalized score: ${Math.round(shoe.averageReviewScore)}/100.` : ""}
           </p>
+          <div className="review-list">
+            {shoe.reviews.map((review) => (
+              <article key={review.id} className="review-card">
+                <div className="catalog-card-topline">
+                  <span className="pill">{review.sourceType}</span>
+                  {review.sentiment ? <span className="pill">{review.sentiment}</span> : null}
+                  {review.scoreNormalized100 ? (
+                    <span className="pill">{review.scoreNormalized100}/100</span>
+                  ) : null}
+                </div>
+                <h3>{review.title ?? "Untitled review"}</h3>
+                <p className="catalog-copy">{review.excerpt ?? "Excerpt pending."}</p>
+                <p className="detail-muted">
+                  {review.sourceName}
+                  {review.authorName ? ` by ${review.authorName}` : ""}
+                  {review.publishedAt ? ` • ${review.publishedAt}` : ""}
+                </p>
+                <a className="text-link" href={review.sourceUrl} target="_blank" rel="noreferrer">
+                  Open source review
+                </a>
+              </article>
+            ))}
+          </div>
+          {shoe.reviewCount === 0 ? <p className="detail-muted">No approved reviews yet.</p> : null}
+          <div className="card-actions">
+            <Link className="text-link" href={`/compare?shoe=${shoe.slug}`}>
+              Compare this shoe
+            </Link>
+          </div>
         </article>
       </section>
     </main>

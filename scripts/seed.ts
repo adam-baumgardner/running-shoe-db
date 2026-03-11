@@ -1,8 +1,24 @@
 import { config } from "dotenv";
 import { eq } from "drizzle-orm";
 import { closeDbConnection, getDb } from "../db";
-import { seedBrands, seedReleases, seedReviewSources, seedShoes, seedSpecs } from "../db/seed-data";
-import { brands, reviewSources, shoeReleases, shoes, shoeSpecs } from "../db/schema";
+import {
+  seedBrands,
+  seedReleases,
+  seedReviewAuthors,
+  seedReviews,
+  seedReviewSources,
+  seedShoes,
+  seedSpecs,
+} from "../db/seed-data";
+import {
+  brands,
+  reviewAuthors,
+  reviews,
+  reviewSources,
+  shoeReleases,
+  shoes,
+  shoeSpecs,
+} from "../db/schema";
 
 config({ path: ".env.local" });
 
@@ -126,6 +142,73 @@ async function main() {
         baseDomain: source.baseDomain,
       },
     });
+  }
+
+  const sourceRows = await db.select().from(reviewSources);
+  const sourceIdBySlug = new Map(sourceRows.map((source) => [source.slug, source.id]));
+
+  for (const author of seedReviewAuthors) {
+    const sourceId = sourceIdBySlug.get(author.sourceSlug);
+    if (!sourceId) throw new Error(`Missing source for author ${author.displayName}`);
+
+    const existingAuthor = await db.query.reviewAuthors.findFirst({
+      where: eq(reviewAuthors.profileUrl, author.profileUrl),
+    });
+
+    if (existingAuthor) {
+      await db
+        .update(reviewAuthors)
+        .set({
+          sourceId,
+          displayName: author.displayName,
+          profileUrl: author.profileUrl,
+        })
+        .where(eq(reviewAuthors.id, existingAuthor.id));
+    } else {
+      await db.insert(reviewAuthors).values({
+        sourceId,
+        displayName: author.displayName,
+        profileUrl: author.profileUrl,
+      });
+    }
+  }
+
+  const authorRows = await db.select().from(reviewAuthors);
+  const authorIdByKey = new Map(
+    authorRows.map((author) => [`${author.sourceId}:${author.displayName}`, author.id] as const)
+  );
+
+  for (const review of seedReviews) {
+    const sourceId = sourceIdBySlug.get(review.sourceSlug);
+    const releaseId = releaseIdByKey.get(review.releaseKey);
+    if (!sourceId) throw new Error(`Missing source for review ${review.sourceUrl}`);
+    if (!releaseId) throw new Error(`Missing release for review ${review.sourceUrl}`);
+
+    const authorId = authorIdByKey.get(`${sourceId}:${review.authorName}`) ?? null;
+    const existingReview = await db.query.reviews.findFirst({
+      where: eq(reviews.sourceUrl, review.sourceUrl),
+    });
+
+    const values = {
+      releaseId,
+      sourceId,
+      authorId,
+      sourceUrl: review.sourceUrl,
+      title: review.title,
+      excerpt: review.excerpt,
+      scoreNormalized100: review.scoreNormalized100,
+      originalScoreValue: review.originalScoreValue,
+      originalScoreScale: review.originalScoreScale,
+      sentiment: review.sentiment,
+      status: review.status,
+      publishedAt: new Date(review.publishedAt),
+    };
+
+    if (existingReview) {
+      await db.update(reviews).set(values).where(eq(reviews.id, existingReview.id));
+    } else {
+      await db.insert(reviews).values(values);
+    }
   }
 
   console.log("Seed completed.");
