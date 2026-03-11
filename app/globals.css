@@ -198,7 +198,8 @@ a {
 }
 
 .filter-field input,
-.filter-field select {
+.filter-field select,
+.filter-field textarea {
   width: 100%;
   padding: 0.8rem 0.9rem;
   border-radius: 0.85rem;
@@ -206,6 +207,39 @@ a {
   background: var(--surface-strong);
   color: var(--ink);
   font: inherit;
+}
+
+.editorial-form {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.editorial-table-panel {
+  margin-top: 1.5rem;
+}
+
+.editorial-table {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 0.7fr 1.2fr;
+  gap: 0.75rem 1rem;
+  align-items: start;
+}
+
+.editorial-table-head {
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.editorial-row {
+  display: contents;
+}
+
+.status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .filter-actions {
@@ -366,6 +400,10 @@ a {
   }
 
   .filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .editorial-table {
     grid-template-columns: 1fr;
   }
 }

@@ -24,6 +24,7 @@ export default function RootLayout({
               <Link href="/shoes">Shoes</Link>
               <Link href="/compare">Compare</Link>
               <Link href="/reviews">Reviews</Link>
+              <Link href="/internal">Internal</Link>
             </nav>
           </div>
         </header>
