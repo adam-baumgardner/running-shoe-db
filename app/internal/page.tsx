@@ -4,6 +4,7 @@ import {
   createReviewSourceAction,
   createShoeModelAction,
   runBelieveInTheRunCrawlAction,
+  runRedditRunningShoeGeeksCrawlAction,
   updateReviewStatusAction,
   upsertReleaseAction,
 } from "@/app/internal/actions";
@@ -320,24 +321,48 @@ export default async function InternalPage() {
       <section className="detail-panel editorial-table-panel">
         <p className="feature-kicker">Ingestion Targets</p>
         <h2>Automated crawl foundation</h2>
-        <form action={runBelieveInTheRunCrawlAction} className="editorial-form editorial-form-inline">
-          <label className="filter-field">
-            <span>Believe in the Run crawl target</span>
-            <select name="releaseId" required defaultValue="">
-              <option value="" disabled>
-                Select release to search
-              </option>
-              {data.releases.map((release) => (
-                <option key={release.id} value={release.id}>
-                  {release.label}
+        <div className="detail-grid">
+          <form action={runBelieveInTheRunCrawlAction} className="editorial-form editorial-form-inline">
+            <label className="filter-field">
+              <span>Believe in the Run crawl target</span>
+              <select name="releaseId" required defaultValue="">
+                <option value="" disabled>
+                  Select release to search
                 </option>
-              ))}
-            </select>
-          </label>
-          <button className="button-primary" type="submit">
-            Run BITR crawl
-          </button>
-        </form>
+                {data.releases.map((release) => (
+                  <option key={release.id} value={release.id}>
+                    {release.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="button-primary" type="submit">
+              Run BITR crawl
+            </button>
+          </form>
+
+          <form
+            action={runRedditRunningShoeGeeksCrawlAction}
+            className="editorial-form editorial-form-inline"
+          >
+            <label className="filter-field">
+              <span>Reddit crawl target</span>
+              <select name="releaseId" required defaultValue="">
+                <option value="" disabled>
+                  Select release to search
+                </option>
+                {data.releases.map((release) => (
+                  <option key={release.id} value={release.id}>
+                    {release.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="button-primary" type="submit">
+              Run Reddit crawl
+            </button>
+          </form>
+        </div>
         <div className="editorial-table editorial-table--ingestion">
           <div className="editorial-table-head">Source</div>
           <div className="editorial-table-head">Importer</div>

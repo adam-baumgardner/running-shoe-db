@@ -189,15 +189,14 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
           searchPattern: crawlSources.searchPattern,
           cadenceLabel: crawlSources.cadenceLabel,
           isActive: crawlSources.isActive,
-          latestRunStatus: crawlRuns.status,
         })
         .from(crawlSources)
         .innerJoin(reviewSources, eq(crawlSources.reviewSourceId, reviewSources.id))
-        .leftJoin(crawlRuns, eq(crawlRuns.crawlSourceId, crawlSources.id))
         .orderBy(reviewSources.name),
       db
         .select({
           id: crawlRuns.id,
+          crawlSourceId: crawlRuns.crawlSourceId,
           sourceName: reviewSources.name,
           query: crawlRuns.query,
           status: crawlRuns.status,
@@ -210,6 +209,13 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .innerJoin(reviewSources, eq(crawlSources.reviewSourceId, reviewSources.id))
         .orderBy(desc(crawlRuns.createdAt)),
     ]);
+
+  const latestStatusBySourceId = new Map<string, EditorialDashboardData["crawlSources"][number]["latestRunStatus"]>();
+  for (const run of crawlRunRows) {
+    if (!latestStatusBySourceId.has(run.crawlSourceId)) {
+      latestStatusBySourceId.set(run.crawlSourceId, run.status);
+    }
+  }
 
   return {
     stats: {
@@ -256,7 +262,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       searchPattern: source.searchPattern,
       cadenceLabel: source.cadenceLabel,
       isActive: source.isActive,
-      latestRunStatus: source.latestRunStatus,
+      latestRunStatus: latestStatusBySourceId.get(source.id) ?? null,
     })),
     recentCrawlRuns: crawlRunRows.map((run) => ({
       id: run.id,

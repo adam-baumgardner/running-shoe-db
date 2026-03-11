@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { runBelieveInTheRunImport } from "@/lib/ingestion/believe-in-the-run-runner";
+import { runRedditRunningShoeGeeksImport } from "@/lib/ingestion/reddit-running-shoe-geeks-runner";
 import { brands, reviewAuthors, reviews, reviewSources, shoeReleases, shoes, shoeSpecs } from "@/db/schema";
 
 function requireDatabase() {
@@ -271,6 +272,20 @@ export async function runBelieveInTheRunCrawlAction(formData: FormData) {
   }
 
   await runBelieveInTheRunImport({ releaseId });
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
+export async function runRedditRunningShoeGeeksCrawlAction(formData: FormData) {
+  requireDatabase();
+  const releaseId = String(formData.get("releaseId") ?? "").trim();
+
+  if (!releaseId) {
+    throw new Error("Release is required.");
+  }
+
+  await runRedditRunningShoeGeeksImport({ releaseId });
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
