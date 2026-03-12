@@ -113,71 +113,78 @@ export interface EditorialDashboardData {
 
 export async function getEditorialDashboardData(): Promise<EditorialDashboardData> {
   if (!process.env.DATABASE_URL) {
-    return {
-      stats: {
-        totalBrands: 3,
-        totalShoes: 3,
-        totalSources: 3,
-        totalReviews: 3,
-        pendingReviews: 0,
-      },
-      brands: [],
-      shoes: [],
-      releases: [],
-      sources: [],
-      recentReviews: [],
-      recentReleases: [],
-      releaseCoverage: [],
-      crawlSources: [],
-      recentCrawlRuns: [],
-      recentOverrideEvents: [],
-    };
+    return getFallbackEditorialDashboardData();
   }
 
   const db = getDb();
 
   const [brandCountRow, shoeCountRow, sourceCountRow, reviewCountRow, pendingCountRow] =
     await Promise.all([
-      db.select({ count: count(brands.id) }).from(brands),
-      db.select({ count: count(shoes.id) }).from(shoes),
-      db.select({ count: count(reviewSources.id) }).from(reviewSources),
-      db.select({ count: count(reviews.id) }).from(reviews),
-      db.select({ count: count(reviews.id) }).from(reviews).where(eq(reviews.status, "pending")),
+      safeQuery(db.select({ count: count(brands.id) }).from(brands), [{ count: 0 }], "brand count"),
+      safeQuery(db.select({ count: count(shoes.id) }).from(shoes), [{ count: 0 }], "shoe count"),
+      safeQuery(
+        db.select({ count: count(reviewSources.id) }).from(reviewSources),
+        [{ count: 0 }],
+        "source count",
+      ),
+      safeQuery(db.select({ count: count(reviews.id) }).from(reviews), [{ count: 0 }], "review count"),
+      safeQuery(
+        db.select({ count: count(reviews.id) }).from(reviews).where(eq(reviews.status, "pending")),
+        [{ count: 0 }],
+        "pending review count",
+      ),
     ]);
 
   const [brandRows, shoeRows, releaseRows, sourceRows] = await Promise.all([
-    db.select({ id: brands.id, name: brands.name }).from(brands).orderBy(brands.name),
-    db
-      .select({
-        id: shoes.id,
-        brandName: brands.name,
-        shoeName: shoes.name,
-      })
-      .from(shoes)
-      .innerJoin(brands, eq(shoes.brandId, brands.id))
-      .orderBy(brands.name, shoes.name),
-    db
-      .select({
-        id: shoeReleases.id,
-        shoeName: shoes.name,
-        versionName: shoeReleases.versionName,
-      })
-      .from(shoeReleases)
-      .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
-      .orderBy(desc(shoeReleases.releaseYear), shoes.name),
-    db
-      .select({
-        id: reviewSources.id,
-        name: reviewSources.name,
-        sourceType: reviewSources.sourceType,
-      })
-      .from(reviewSources)
-      .orderBy(reviewSources.name),
+    safeQuery(
+      db.select({ id: brands.id, name: brands.name }).from(brands).orderBy(brands.name),
+      [],
+      "brand rows",
+    ),
+    safeQuery(
+      db
+        .select({
+          id: shoes.id,
+          brandName: brands.name,
+          shoeName: shoes.name,
+        })
+        .from(shoes)
+        .innerJoin(brands, eq(shoes.brandId, brands.id))
+        .orderBy(brands.name, shoes.name),
+      [],
+      "shoe rows",
+    ),
+    safeQuery(
+      db
+        .select({
+          id: shoeReleases.id,
+          shoeName: shoes.name,
+          versionName: shoeReleases.versionName,
+        })
+        .from(shoeReleases)
+        .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+        .orderBy(desc(shoeReleases.releaseYear), shoes.name),
+      [],
+      "release rows",
+    ),
+    safeQuery(
+      db
+        .select({
+          id: reviewSources.id,
+          name: reviewSources.name,
+          sourceType: reviewSources.sourceType,
+        })
+        .from(reviewSources)
+        .orderBy(reviewSources.name),
+      [],
+      "source rows",
+    ),
   ]);
 
   const [reviewRows, recentReleaseRows, coverageRows, crawlSourceRows, crawlRunRows] =
     await Promise.all([
-      db
+      safeQuery(
+        db
         .select({
           id: reviews.id,
           releaseId: reviews.releaseId,
@@ -197,7 +204,11 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .innerJoin(reviewSources, eq(reviews.sourceId, reviewSources.id))
         .orderBy(desc(reviews.createdAt))
         .limit(20),
-      db
+        [],
+        "recent reviews",
+      ),
+      safeQuery(
+        db
         .select({
           id: shoeReleases.id,
           shoeName: shoes.name,
@@ -212,7 +223,11 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .leftJoin(shoeSpecs, eq(shoeSpecs.releaseId, shoeReleases.id))
         .orderBy(desc(shoeReleases.releaseYear), shoes.name)
         .limit(20),
-      db
+        [],
+        "recent releases",
+      ),
+      safeQuery(
+        db
         .select({
           releaseId: shoeReleases.id,
           shoeName: shoes.name,
@@ -227,7 +242,11 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .leftJoin(reviewSources, eq(reviews.sourceId, reviewSources.id))
         .where(eq(shoeReleases.isCurrent, true))
         .orderBy(desc(shoeReleases.releaseYear), shoes.name),
-      db
+        [],
+        "coverage rows",
+      ),
+      safeQuery(
+        db
         .select({
           id: crawlSources.id,
           importerKey: crawlSources.importerKey,
@@ -241,7 +260,11 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .from(crawlSources)
         .innerJoin(reviewSources, eq(crawlSources.reviewSourceId, reviewSources.id))
         .orderBy(reviewSources.name),
-      db
+        [],
+        "crawl sources",
+      ),
+      safeQuery(
+        db
         .select({
           id: crawlRuns.id,
           crawlSourceId: crawlRuns.crawlSourceId,
@@ -259,6 +282,9 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .innerJoin(reviewSources, eq(crawlSources.reviewSourceId, reviewSources.id))
         .orderBy(desc(crawlRuns.createdAt))
         .limit(20),
+        [],
+        "crawl runs",
+      ),
     ]);
 
   const latestStatusBySourceId = new Map<string, EditorialDashboardData["crawlSources"][number]["latestRunStatus"]>();
@@ -449,6 +475,37 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
       .slice(0, 12),
   };
+}
+
+function getFallbackEditorialDashboardData(): EditorialDashboardData {
+  return {
+    stats: {
+      totalBrands: 3,
+      totalShoes: 3,
+      totalSources: 3,
+      totalReviews: 3,
+      pendingReviews: 0,
+    },
+    brands: [],
+    shoes: [],
+    releases: [],
+    sources: [],
+    recentReviews: [],
+    recentReleases: [],
+    releaseCoverage: [],
+    crawlSources: [],
+    recentCrawlRuns: [],
+    recentOverrideEvents: [],
+  };
+}
+
+async function safeQuery<T>(promise: Promise<T>, fallback: T, label: string): Promise<T> {
+  try {
+    return await promise;
+  } catch (error) {
+    console.error(`Editorial dashboard query failed: ${label}`, error);
+    return fallback;
+  }
 }
 
 function getEditorialHighlights(metadata: unknown) {
