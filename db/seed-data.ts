@@ -204,6 +204,20 @@ export const seedReviewSources: SeedReviewSource[] = [
     siteUrl: "https://www.reddit.com/r/RunningShoeGeeks/",
     baseDomain: "reddit.com",
   },
+  {
+    name: "RunRepeat",
+    slug: "runrepeat",
+    sourceType: "editorial",
+    siteUrl: "https://runrepeat.com",
+    baseDomain: "runrepeat.com",
+  },
+  {
+    name: "Doctors of Running",
+    slug: "doctors-of-running",
+    sourceType: "editorial",
+    siteUrl: "https://www.doctorsofrunning.com",
+    baseDomain: "doctorsofrunning.com",
+  },
 ];
 
 export const seedReviewAuthors: SeedReviewAuthor[] = [
@@ -290,5 +304,23 @@ export const seedCrawlSources: SeedCrawlSource[] = [
     searchPattern: "{shoe_name}",
     cadenceLabel: "twice-daily",
     notes: "Search subreddit threads and comments for shoe model sentiment and review discussions.",
+  },
+  {
+    reviewSourceSlug: "runrepeat",
+    importerKey: "runrepeat",
+    targetType: "search",
+    targetUrl: "https://runrepeat.com/catalog/search",
+    searchPattern: "{brand_name} {shoe_name}",
+    cadenceLabel: "manual",
+    notes: "Planned importer for structured review and spec extraction from RunRepeat.",
+  },
+  {
+    reviewSourceSlug: "doctors-of-running",
+    importerKey: "doctors-of-running",
+    targetType: "search",
+    targetUrl: "https://www.doctorsofrunning.com/search",
+    searchPattern: "{brand_name} {shoe_name}",
+    cadenceLabel: "manual",
+    notes: "Planned importer for long-form editorial reviews from Doctors of Running.",
   },
 ];

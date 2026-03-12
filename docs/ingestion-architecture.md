@@ -113,6 +113,11 @@ The first two source targets are:
 - Believe in the Run
 - Reddit `r/RunningShoeGeeks`
 
+Next queued source targets are:
+
+- RunRepeat
+- Doctors of Running
+
 The near-term query strategy for both is shoe-name search:
 
 - `Believe in the Run`: search site content for the shoe model name and brand name

@@ -338,10 +338,12 @@ The model is intentionally built so automated ingestion and manual editorial upd
 - secure internal auth model
 - public review submission workflow behind moderation
 - richer release-level recommendation and comparison logic
+- add the next trusted sources, starting with RunRepeat and Doctors of Running
 
 ## 17. Open questions
 
 - Which additional sources should be treated as tier-one trusted inputs after BITR and Reddit?
+- In the near term, RunRepeat and Doctors of Running are the next planned sources.
 - What moderation policy should apply to future public user-submitted reviews?
 - How should automated spec ingestion be prioritized relative to review ingestion?
 - When should internal auth move from shared credentials to named users?
