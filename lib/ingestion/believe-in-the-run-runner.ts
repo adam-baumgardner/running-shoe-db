@@ -104,11 +104,15 @@ export async function runBelieveInTheRunImport({
     });
     const averageCandidateConfidence = getAverageConfidence(candidates);
     const maxCandidateConfidence = getMaxConfidence(candidates);
+    let fallbackCount = 0;
 
     let storedCount = 0;
     for (const candidate of candidates) {
       failureStage = "article-fetch";
       const enriched = await fetchBelieveInTheRunArticle(candidate);
+      if (enriched.usedFallback) {
+        fallbackCount += 1;
+      }
       const authorId = await getOrCreateReviewAuthor(selected.sourceId, enriched.authorName);
       const titleFingerprint = buildTitleFingerprint(enriched.title);
       const importerConfidence = getBelieveInTheRunConfidence(candidate, enriched.summary, enriched.body);
@@ -176,10 +180,16 @@ export async function runBelieveInTheRunImport({
       }
     }
 
+    const status = determineRunStatus({
+      discoveredCount: candidates.length,
+      storedCount,
+      fallbackCount,
+    });
+
     await db
       .update(crawlRuns)
       .set({
-        status: "succeeded",
+        status,
         discoveredCount: candidates.length,
         storedCount,
         finishedAt: new Date(),
@@ -188,6 +198,7 @@ export async function runBelieveInTheRunImport({
           discoveryStrategy: "sitemap",
           averageCandidateConfidence,
           maxCandidateConfidence,
+          fallbackCount,
           failureStage: null,
           noHitReason: candidates.length === 0 ? "no matching review urls found in sitemap" : null,
         },
@@ -198,6 +209,7 @@ export async function runBelieveInTheRunImport({
       discoveredCount: candidates.length,
       storedCount,
       urls: candidates.map((candidate) => candidate.sourceUrl),
+      status,
     };
   } catch (error) {
     await db
@@ -384,6 +396,7 @@ async function fetchBelieveInTheRunArticle(candidate: BelieveInTheRunCandidate) 
     sentiment,
     highlights,
     rawHtml: html,
+    usedFallback: false,
   };
 }
 
@@ -573,7 +586,28 @@ function enrichFallbackCandidate(candidate: BelieveInTheRunCandidate) {
     sentiment: deriveSentiment([candidate.excerpt || candidate.title]),
     highlights: extractHighlights([candidate.excerpt || candidate.title]),
     rawHtml: candidate.rawHtmlSnippet || "",
+    usedFallback: true,
   };
+}
+
+function determineRunStatus({
+  discoveredCount,
+  storedCount,
+  fallbackCount,
+}: {
+  discoveredCount: number;
+  storedCount: number;
+  fallbackCount: number;
+}) {
+  if (discoveredCount === 0) {
+    return "succeeded" as const;
+  }
+
+  if (storedCount === 0 || fallbackCount > 0) {
+    return "partial" as const;
+  }
+
+  return "succeeded" as const;
 }
 
 function getSitemapMatchConfidence({

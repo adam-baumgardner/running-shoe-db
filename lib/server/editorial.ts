@@ -60,6 +60,16 @@ export interface EditorialDashboardData {
     weightOzMen: number | null;
     dropMm: number | null;
   }>;
+  releaseCoverage: Array<{
+    releaseId: string;
+    label: string;
+    approvedReviewCount: number;
+    editorialCount: number;
+    redditCount: number;
+    userCount: number;
+    pendingCount: number;
+    coverageStatus: "healthy" | "thin" | "missing-editorial" | "missing-community";
+  }>;
   crawlSources: Array<{
     id: string;
     importerKey: string;
@@ -88,6 +98,7 @@ export interface EditorialDashboardData {
     maxCandidateConfidence: number | null;
     failureStage: string | null;
     noHitReason: string | null;
+    fallbackCount: number | null;
   }>;
   recentOverrideEvents: Array<{
     reviewId: string;
@@ -116,6 +127,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       sources: [],
       recentReviews: [],
       recentReleases: [],
+      releaseCoverage: [],
       crawlSources: [],
       recentCrawlRuns: [],
       recentOverrideEvents: [],
@@ -136,6 +148,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
     sourceRows,
     reviewRows,
     recentReleaseRows,
+    coverageRows,
     crawlSourceRows,
     crawlRunRows,
   ] =
@@ -209,6 +222,21 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .limit(20),
       db
         .select({
+          releaseId: shoeReleases.id,
+          shoeName: shoes.name,
+          versionName: shoeReleases.versionName,
+          reviewId: reviews.id,
+          reviewStatus: reviews.status,
+          sourceType: reviewSources.sourceType,
+        })
+        .from(shoeReleases)
+        .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+        .leftJoin(reviews, eq(reviews.releaseId, shoeReleases.id))
+        .leftJoin(reviewSources, eq(reviews.sourceId, reviewSources.id))
+        .where(eq(shoeReleases.isCurrent, true))
+        .orderBy(desc(shoeReleases.releaseYear), shoes.name),
+      db
+        .select({
           id: crawlSources.id,
           importerKey: crawlSources.importerKey,
           sourceName: reviewSources.name,
@@ -268,6 +296,64 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
     })),
   );
 
+  const coverageMap = new Map<
+    string,
+    {
+      label: string;
+      approvedReviewCount: number;
+      editorialCount: number;
+      redditCount: number;
+      userCount: number;
+      pendingCount: number;
+    }
+  >();
+
+  for (const row of recentReleaseRows) {
+    coverageMap.set(row.id, {
+      label: `${row.shoeName} ${row.versionName}`,
+      approvedReviewCount: 0,
+      editorialCount: 0,
+      redditCount: 0,
+      userCount: 0,
+      pendingCount: 0,
+    });
+  }
+
+  for (const row of coverageRows) {
+    const entry = coverageMap.get(row.releaseId) ?? {
+      label: `${row.shoeName} ${row.versionName}`,
+      approvedReviewCount: 0,
+      editorialCount: 0,
+      redditCount: 0,
+      userCount: 0,
+      pendingCount: 0,
+    };
+
+    if (!row.reviewId) {
+      coverageMap.set(row.releaseId, entry);
+      continue;
+    }
+
+    if (row.reviewStatus === "pending") {
+      entry.pendingCount += 1;
+    }
+
+    if (row.reviewStatus === "approved" && row.sourceType) {
+      entry.approvedReviewCount += 1;
+      if (row.sourceType === "editorial") {
+        entry.editorialCount += 1;
+      }
+      if (row.sourceType === "reddit") {
+        entry.redditCount += 1;
+      }
+      if (row.sourceType === "user") {
+        entry.userCount += 1;
+      }
+    }
+
+    coverageMap.set(row.releaseId, entry);
+  }
+
   return {
     stats: {
       totalBrands: Number(brandCountRow[0]?.count ?? 0),
@@ -308,6 +394,25 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       weightOzMen: release.weightOzMen ? Number(release.weightOzMen) : null,
       dropMm: release.dropMm,
     })),
+    releaseCoverage: [...coverageMap.entries()]
+      .map(([releaseId, entry]) => ({
+        releaseId,
+        label: entry.label,
+        approvedReviewCount: entry.approvedReviewCount,
+        editorialCount: entry.editorialCount,
+        redditCount: entry.redditCount,
+        userCount: entry.userCount,
+        pendingCount: entry.pendingCount,
+        coverageStatus: getCoverageStatus(entry),
+      }))
+      .sort((left, right) => {
+        const scoreDelta = coverageSeverity(left.coverageStatus) - coverageSeverity(right.coverageStatus);
+        if (scoreDelta !== 0) {
+          return scoreDelta;
+        }
+
+        return left.label.localeCompare(right.label);
+      }),
     crawlSources: crawlSourceRows.map((source) => ({
       ...(() => {
         const latestRun = latestRunMetaBySourceId.get(source.id);
@@ -346,6 +451,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       maxCandidateConfidence: getCrawlRunNumber(run.metadata, "maxCandidateConfidence"),
       failureStage: getCrawlRunString(run.metadata, "failureStage"),
       noHitReason: getCrawlRunString(run.metadata, "noHitReason"),
+      fallbackCount: getCrawlRunNumber(run.metadata, "fallbackCount"),
     })),
     recentOverrideEvents: recentOverrideEvents
       .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
@@ -400,6 +506,43 @@ function getCrawlRunNumber(metadata: unknown, key: string) {
 
   const value = (metadata as Record<string, unknown>)[key];
   return typeof value === "number" ? value : null;
+}
+
+function getCoverageStatus(entry: {
+  approvedReviewCount: number;
+  editorialCount: number;
+  redditCount: number;
+}) {
+  if (entry.approvedReviewCount === 0) {
+    return "thin" as const;
+  }
+
+  if (entry.editorialCount === 0) {
+    return "missing-editorial" as const;
+  }
+
+  if (entry.redditCount === 0) {
+    return "missing-community" as const;
+  }
+
+  if (entry.approvedReviewCount >= 3) {
+    return "healthy" as const;
+  }
+
+  return "thin" as const;
+}
+
+function coverageSeverity(status: "healthy" | "thin" | "missing-editorial" | "missing-community") {
+  switch (status) {
+    case "missing-editorial":
+      return 0;
+    case "missing-community":
+      return 1;
+    case "thin":
+      return 2;
+    case "healthy":
+      return 3;
+  }
 }
 
 function normalizeCadenceLabel(value: string | null) {

@@ -25,4 +25,5 @@ export interface CrawlExecutionResult {
   discoveredCount: number;
   storedCount: number;
   urls: string[];
+  status?: "succeeded" | "partial" | "failed";
 }

@@ -500,9 +500,40 @@ export default async function InternalPage() {
                     Max confidence: {formatConfidence(run.maxCandidateConfidence)}
                   </p>
                 ) : null}
+                {run.fallbackCount !== null ? (
+                  <p className="detail-muted">Fallbacks: {run.fallbackCount}</p>
+                ) : null}
               </div>
               <div>{run.discoveredCount}</div>
               <div>{run.storedCount}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="detail-panel editorial-table-panel">
+        <p className="feature-kicker">Coverage Gaps</p>
+        <h2>Current release review coverage</h2>
+        <div className="editorial-table editorial-table--releases">
+          <div className="editorial-table-head">Release</div>
+          <div className="editorial-table-head">Status</div>
+          <div className="editorial-table-head">Approved</div>
+          <div className="editorial-table-head">Editorial / Reddit / User</div>
+          <div className="editorial-table-head">Pending</div>
+
+          {data.releaseCoverage.map((release) => (
+            <div className="editorial-row" key={release.releaseId}>
+              <div>
+                <strong>{release.label}</strong>
+              </div>
+              <div>
+                <span className="pill">{release.coverageStatus}</span>
+              </div>
+              <div>{release.approvedReviewCount}</div>
+              <div>
+                {release.editorialCount} / {release.redditCount} / {release.userCount}
+              </div>
+              <div>{release.pendingCount}</div>
             </div>
           ))}
         </div>

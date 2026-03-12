@@ -120,11 +120,15 @@ export async function runRedditRunningShoeGeeksImport({
     });
     const averageCandidateConfidence = getAverageConfidence(candidates);
     const maxCandidateConfidence = getMaxConfidence(candidates);
+    let fallbackCount = 0;
 
     let storedCount = 0;
     for (const candidate of candidates) {
       failureStage = "thread-fetch";
       const enriched = await fetchRedditThread(candidate);
+      if (enriched.usedFallback) {
+        fallbackCount += 1;
+      }
       const authorId = await getOrCreateReviewAuthor(selected.sourceId, enriched.authorName);
       const titleFingerprint = buildTitleFingerprint(enriched.title);
       const importerConfidence = getRedditConfidence(candidate, enriched.summary, enriched.topComments);
@@ -193,10 +197,16 @@ export async function runRedditRunningShoeGeeksImport({
       }
     }
 
+    const status = determineRunStatus({
+      discoveredCount: candidates.length,
+      storedCount,
+      fallbackCount,
+    });
+
     await db
       .update(crawlRuns)
       .set({
-        status: "succeeded",
+        status,
         discoveredCount: candidates.length,
         storedCount,
         finishedAt: new Date(),
@@ -205,6 +215,7 @@ export async function runRedditRunningShoeGeeksImport({
           discoveryStrategy: "subreddit-search-json",
           averageCandidateConfidence,
           maxCandidateConfidence,
+          fallbackCount,
           failureStage: null,
           noHitReason: candidates.length === 0 ? "no relevant subreddit threads matched query" : null,
         },
@@ -215,6 +226,7 @@ export async function runRedditRunningShoeGeeksImport({
       discoveredCount: candidates.length,
       storedCount,
       urls: candidates.map((candidate) => candidate.sourceUrl),
+      status,
     };
   } catch (error) {
     await db
@@ -400,6 +412,7 @@ async function fetchRedditThread(candidate: RedditCandidate) {
     highlights: extractHighlights([summary, ...topComments.map((comment) => comment.body)]),
     topComments,
     rawJson: payload,
+    usedFallback: false,
   };
 }
 
@@ -419,7 +432,28 @@ function enrichFallbackCandidate(candidate: RedditCandidate) {
     highlights: extractHighlights([summary]),
     topComments: [],
     rawJson: candidate.rawJson,
+    usedFallback: true,
   };
+}
+
+function determineRunStatus({
+  discoveredCount,
+  storedCount,
+  fallbackCount,
+}: {
+  discoveredCount: number;
+  storedCount: number;
+  fallbackCount: number;
+}) {
+  if (discoveredCount === 0) {
+    return "succeeded" as const;
+  }
+
+  if (storedCount === 0 || fallbackCount > 0) {
+    return "partial" as const;
+  }
+
+  return "succeeded" as const;
 }
 
 async function getOrCreateReviewAuthor(sourceId: string, authorName: string | undefined) {
