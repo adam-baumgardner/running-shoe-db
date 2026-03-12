@@ -25,6 +25,7 @@ export interface EditorialReleaseOption {
 
 export interface EditorialReviewRow {
   id: string;
+  releaseId: string;
   title: string | null;
   sourceUrl: string;
   status: "pending" | "approved" | "rejected" | "flagged";
@@ -32,6 +33,8 @@ export interface EditorialReviewRow {
   scoreNormalized100: number | null;
   releaseLabel: string;
   sourceName: string;
+  highlights: string[];
+  duplicateOfReviewId: string | null;
 }
 
 export interface EditorialDashboardData {
@@ -151,11 +154,13 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       db
         .select({
           id: reviews.id,
+          releaseId: reviews.releaseId,
           title: reviews.title,
           sourceUrl: reviews.sourceUrl,
           status: reviews.status,
           sentiment: reviews.sentiment,
           scoreNormalized100: reviews.scoreNormalized100,
+          metadata: reviews.metadata,
           shoeName: shoes.name,
           versionName: shoeReleases.versionName,
           sourceName: reviewSources.name,
@@ -240,6 +245,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
     sources: sourceRows,
     recentReviews: reviewRows.map((review) => ({
       id: review.id,
+      releaseId: review.releaseId,
       title: review.title,
       sourceUrl: review.sourceUrl,
       status: review.status,
@@ -247,6 +253,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       scoreNormalized100: review.scoreNormalized100,
       releaseLabel: `${review.shoeName} ${review.versionName}`,
       sourceName: review.sourceName,
+      highlights: getEditorialHighlights(review.metadata),
+      duplicateOfReviewId: getDuplicateOfReviewId(review.metadata),
     })),
     recentReleases: recentReleaseRows.map((release) => ({
       id: release.id,
@@ -277,4 +285,26 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       errorMessage: run.errorMessage,
     })),
   };
+}
+
+function getEditorialHighlights(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") {
+    return [];
+  }
+
+  const value = (metadata as Record<string, unknown>).highlights;
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === "string").slice(0, 4);
+}
+
+function getDuplicateOfReviewId(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+
+  const value = (metadata as Record<string, unknown>).duplicateOfReviewId;
+  return typeof value === "string" ? value : null;
 }

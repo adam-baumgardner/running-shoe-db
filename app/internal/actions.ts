@@ -263,6 +263,74 @@ export async function updateReviewStatusAction(formData: FormData) {
   revalidatePath("/shoes");
 }
 
+export async function updateReviewEditorialOverridesAction(formData: FormData) {
+  const db = requireDatabase();
+  const reviewId = String(formData.get("reviewId") ?? "").trim();
+  const sentimentRaw = String(formData.get("sentiment") ?? "").trim();
+  const highlightsRaw = String(formData.get("highlights") ?? "").trim();
+  const duplicateOfReviewIdRaw = String(formData.get("duplicateOfReviewId") ?? "").trim();
+
+  if (!reviewId) {
+    throw new Error("Review id is required.");
+  }
+
+  const review = await db.query.reviews.findFirst({
+    where: eq(reviews.id, reviewId),
+  });
+
+  if (!review) {
+    throw new Error("Review not found.");
+  }
+
+  const sentiment = sentimentRaw
+    ? (sentimentRaw as "positive" | "mixed" | "negative")
+    : null;
+  const highlights = highlightsRaw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 4);
+  const duplicateOfReviewId =
+    duplicateOfReviewIdRaw && duplicateOfReviewIdRaw !== reviewId ? duplicateOfReviewIdRaw : null;
+
+  const existingMetadata =
+    review.metadata && typeof review.metadata === "object"
+      ? { ...(review.metadata as Record<string, unknown>) }
+      : {};
+
+  if (sentiment) {
+    existingMetadata.editorialSentimentOverride = sentiment;
+  } else {
+    delete existingMetadata.editorialSentimentOverride;
+  }
+
+  if (highlights.length) {
+    existingMetadata.highlights = highlights;
+    existingMetadata.editorialHighlightOverride = true;
+  } else {
+    delete existingMetadata.highlights;
+    delete existingMetadata.editorialHighlightOverride;
+  }
+
+  if (duplicateOfReviewId) {
+    existingMetadata.duplicateOfReviewId = duplicateOfReviewId;
+  } else {
+    delete existingMetadata.duplicateOfReviewId;
+  }
+
+  await db
+    .update(reviews)
+    .set({
+      sentiment,
+      metadata: existingMetadata,
+      status: duplicateOfReviewId ? "flagged" : review.status,
+    })
+    .where(eq(reviews.id, reviewId));
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
 export async function runBelieveInTheRunCrawlAction(formData: FormData) {
   requireDatabase();
   const releaseId = String(formData.get("releaseId") ?? "").trim();

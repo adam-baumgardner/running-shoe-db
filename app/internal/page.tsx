@@ -5,6 +5,7 @@ import {
   createShoeModelAction,
   runBelieveInTheRunCrawlAction,
   runRedditRunningShoeGeeksCrawlAction,
+  updateReviewEditorialOverridesAction,
   updateReviewStatusAction,
   upsertReleaseAction,
 } from "@/app/internal/actions";
@@ -494,6 +495,12 @@ export default async function InternalPage() {
               <div>
                 <strong>{review.title ?? "Untitled review"}</strong>
                 <p className="detail-muted">{review.sourceUrl}</p>
+                {review.highlights.length ? (
+                  <p className="detail-muted">Highlights: {review.highlights.join(", ")}</p>
+                ) : null}
+                {review.duplicateOfReviewId ? (
+                  <p className="detail-muted">Marked duplicate of {review.duplicateOfReviewId}</p>
+                ) : null}
               </div>
               <div>{review.releaseLabel}</div>
               <div>{review.sourceName}</div>
@@ -510,6 +517,45 @@ export default async function InternalPage() {
                     </button>
                   </form>
                 ))}
+                <form action={updateReviewEditorialOverridesAction} className="editorial-form">
+                  <input name="reviewId" type="hidden" value={review.id} />
+                  <label className="filter-field">
+                    <span>Sentiment override</span>
+                    <select defaultValue={review.sentiment ?? ""} name="sentiment">
+                      <option value="">Unset</option>
+                      <option value="positive">Positive</option>
+                      <option value="mixed">Mixed</option>
+                      <option value="negative">Negative</option>
+                    </select>
+                  </label>
+                  <label className="filter-field">
+                    <span>Highlights</span>
+                    <input
+                      defaultValue={review.highlights.join(", ")}
+                      name="highlights"
+                      placeholder="Fit, Ride, Value"
+                    />
+                  </label>
+                  <label className="filter-field">
+                    <span>Duplicate of</span>
+                    <select defaultValue={review.duplicateOfReviewId ?? ""} name="duplicateOfReviewId">
+                      <option value="">Not duplicate</option>
+                      {data.recentReviews
+                        .filter(
+                          (candidate) =>
+                            candidate.id !== review.id && candidate.releaseId === review.releaseId
+                        )
+                        .map((candidate) => (
+                          <option key={candidate.id} value={candidate.id}>
+                            {candidate.title ?? candidate.sourceName}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                  <button className="button-secondary" type="submit">
+                    Save overrides
+                  </button>
+                </form>
               </div>
             </div>
           ))}
