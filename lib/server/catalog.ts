@@ -49,6 +49,7 @@ export interface ShoeReviewSummary {
   id: string;
   title: string | null;
   excerpt: string | null;
+  highlights: string[];
   scoreNormalized100: number | null;
   sentiment: "positive" | "mixed" | "negative" | null;
   publishedAt: string | null;
@@ -258,6 +259,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
         scoreNormalized100: reviews.scoreNormalized100,
         sentiment: reviews.sentiment,
         publishedAt: reviews.publishedAt,
+        metadata: reviews.metadata,
         sourceName: reviewSources.name,
         sourceType: reviewSources.sourceType,
         sourceUrl: reviews.sourceUrl,
@@ -298,6 +300,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
         id: review.id,
         title: review.title,
         excerpt: review.excerpt,
+        highlights: getReviewHighlights(review.metadata),
         scoreNormalized100: review.scoreNormalized100,
         sentiment: review.sentiment,
         publishedAt: review.publishedAt ? review.publishedAt.toISOString().slice(0, 10) : null,
@@ -310,6 +313,19 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
   } catch {
     return buildFallbackDetail(slug);
   }
+}
+
+function getReviewHighlights(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") {
+    return [];
+  }
+
+  const maybeHighlights = (metadata as Record<string, unknown>).highlights;
+  if (!Array.isArray(maybeHighlights)) {
+    return [];
+  }
+
+  return maybeHighlights.filter((value): value is string => typeof value === "string").slice(0, 3);
 }
 
 export async function getComparisonRows(selectedSlugs: string[]): Promise<ComparisonRow[]> {
@@ -464,6 +480,7 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
         id: `${match.id}-review`,
         title: `${match.release} seed review`,
         excerpt: "Fallback review content for environments without database access.",
+        highlights: ["Cushioning", "Ride"],
         scoreNormalized100: 82,
         sentiment: "positive",
         publishedAt: "2024-01-01",

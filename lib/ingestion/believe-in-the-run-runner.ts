@@ -14,6 +14,13 @@ import {
   shoes,
 } from "@/db/schema";
 import { believeInTheRunImporter } from "@/lib/ingestion/believe-in-the-run";
+import {
+  cleanText,
+  deriveSentiment,
+  extractHighlights,
+  normalizeSearchText,
+  summarizeParts,
+} from "@/lib/ingestion/review-normalization";
 import type { CrawlExecutionResult } from "@/lib/ingestion/types";
 
 interface RunBelieveInTheRunImportParams {
@@ -113,6 +120,7 @@ export async function runBelieveInTheRunImport({
             scoreNormalized100: enriched.scoreNormalized100,
             originalScoreValue: enriched.originalScoreValue,
             originalScoreScale: enriched.originalScoreScale,
+            highlights: enriched.highlights,
           },
         })
         .onConflictDoNothing();
@@ -141,6 +149,7 @@ export async function runBelieveInTheRunImport({
             importer: believeInTheRunImporter.key,
             query,
             authorName: enriched.authorName,
+            highlights: enriched.highlights,
           },
         });
         storedCount += 1;
@@ -318,13 +327,10 @@ async function fetchBelieveInTheRunArticle(candidate: BelieveInTheRunCandidate) 
       $("time").first().attr("datetime")
   );
   const bodyText = extractArticleBodyText($, article);
-  const summary = [candidate.excerpt, schema?.description || "", bodyText]
-    .filter(Boolean)
-    .join(" ")
-    .slice(0, 420)
-    .trim();
+  const summary = summarizeParts([candidate.excerpt, schema?.description || "", bodyText], 420);
   const score = extractScore($, article);
-  const sentiment = deriveEditorialSentiment(summary);
+  const sentiment = deriveSentiment([summary, bodyText, schema?.description || ""]);
+  const highlights = extractHighlights([summary, bodyText, schema?.description || ""]);
 
   return {
     sourceUrl: candidate.sourceUrl,
@@ -337,6 +343,7 @@ async function fetchBelieveInTheRunArticle(candidate: BelieveInTheRunCandidate) 
     originalScoreValue: score?.originalScoreValue ?? null,
     originalScoreScale: score?.originalScoreScale ?? null,
     sentiment,
+    highlights,
     rawHtml: html,
   };
 }
@@ -492,7 +499,8 @@ function enrichFallbackCandidate(candidate: BelieveInTheRunCandidate) {
     scoreNormalized100: null,
     originalScoreValue: null,
     originalScoreScale: null,
-    sentiment: deriveEditorialSentiment(candidate.excerpt || candidate.title),
+    sentiment: deriveSentiment([candidate.excerpt || candidate.title]),
+    highlights: extractHighlights([candidate.excerpt || candidate.title]),
     rawHtml: candidate.rawHtmlSnippet || "",
   };
 }
@@ -524,25 +532,6 @@ function normalizeScore(value: number, scale: number) {
   return Math.max(0, Math.min(100, Math.round((value / scale) * 100)));
 }
 
-function deriveEditorialSentiment(text: string) {
-  const haystack = text.toLowerCase();
-  const positiveSignals = ["great", "excellent", "best", "fun", "smooth", "comfortable", "impressive"];
-  const negativeSignals = ["bad", "harsh", "firm", "awkward", "disappointing", "problem", "issue"];
-
-  const positiveCount = positiveSignals.filter((signal) => haystack.includes(signal)).length;
-  const negativeCount = negativeSignals.filter((signal) => haystack.includes(signal)).length;
-
-  if (positiveCount >= negativeCount + 2) {
-    return "positive" as const;
-  }
-
-  if (negativeCount >= positiveCount + 2) {
-    return "negative" as const;
-  }
-
-  return "mixed" as const;
-}
-
 function looksLikeUiChrome(text: string) {
   const normalized = text.toLowerCase();
   return (
@@ -568,18 +557,6 @@ function looksLikeNonReviewSlug(url: string) {
   ];
 
   return nonReviewSignals.some((signal) => normalized.includes(signal));
-}
-
-function normalizeSearchText(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function cleanText(value: string) {
-  return value.replace(/\s+/g, " ").trim();
 }
 
 function stringOrNull(value: unknown) {

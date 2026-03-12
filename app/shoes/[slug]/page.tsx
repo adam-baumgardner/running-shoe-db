@@ -108,6 +108,15 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                 </div>
                 <h3>{review.title ?? "Untitled review"}</h3>
                 <p className="catalog-copy">{review.excerpt ?? "Excerpt pending."}</p>
+                {review.highlights.length ? (
+                  <div className="detail-chip-row">
+                    {review.highlights.map((highlight) => (
+                      <span className="pill" key={highlight}>
+                        {highlight}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 <p className="detail-muted">
                   {review.sourceName}
                   {review.authorName ? ` by ${review.authorName}` : ""}

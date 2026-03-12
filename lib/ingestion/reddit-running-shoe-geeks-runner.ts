@@ -11,6 +11,13 @@ import {
   shoeReleases,
   shoes,
 } from "@/db/schema";
+import {
+  cleanText,
+  deriveSentiment,
+  extractHighlights,
+  normalizeSearchText,
+  summarizeParts,
+} from "@/lib/ingestion/review-normalization";
 import { redditRunningShoeGeeksImporter } from "@/lib/ingestion/reddit-running-shoe-geeks";
 import type { CrawlExecutionResult } from "@/lib/ingestion/types";
 
@@ -130,6 +137,7 @@ export async function runRedditRunningShoeGeeksImport({
             threadSummary: enriched.summary,
             topComments: enriched.topComments,
             sentiment: enriched.sentiment,
+            highlights: enriched.highlights,
           },
         })
         .onConflictDoNothing();
@@ -158,6 +166,7 @@ export async function runRedditRunningShoeGeeksImport({
             comments: enriched.commentCount,
             score: enriched.score,
             topComments: enriched.topComments,
+            highlights: enriched.highlights,
           },
         });
         storedCount += 1;
@@ -354,7 +363,8 @@ async function fetchRedditThread(candidate: RedditCandidate) {
     publishedAt: unixToDate(thread.created_utc) ?? candidate.publishedAt,
     summary,
     body,
-    sentiment: deriveSentiment(summary, topComments.map((comment) => comment.body)),
+    sentiment: deriveSentiment([summary, ...topComments.map((comment) => comment.body)]),
+    highlights: extractHighlights([summary, ...topComments.map((comment) => comment.body)]),
     topComments,
     rawJson: payload,
   };
@@ -372,7 +382,8 @@ function enrichFallbackCandidate(candidate: RedditCandidate) {
     publishedAt: candidate.publishedAt,
     summary,
     body: summary,
-    sentiment: deriveSentiment(summary, []),
+    sentiment: deriveSentiment([summary]),
+    highlights: extractHighlights([summary]),
     topComments: [],
     rawJson: candidate.rawJson,
   };
@@ -417,8 +428,7 @@ function buildThreadSummary({
   body: string;
   topComments: string[];
 }) {
-  const parts = [cleanText(body), excerpt, ...topComments.map(cleanText)].filter((part) => part.length > 0);
-  return parts.join(" ").slice(0, 420).trim();
+  return summarizeParts([body, excerpt, ...topComments], 420);
 }
 
 function buildThreadBody({
@@ -443,65 +453,12 @@ function buildThreadBody({
   return segments.join("\n\n").slice(0, 4000);
 }
 
-function deriveSentiment(summary: string, topComments: string[]) {
-  const haystack = normalizeSearchText([summary, ...topComments].join(" "));
-  const positiveSignals = [
-    "love",
-    "great",
-    "excellent",
-    "favorite",
-    "fast",
-    "smooth",
-    "comfortable",
-    "fun",
-    "impressive",
-    "stable",
-  ];
-  const negativeSignals = [
-    "bad",
-    "harsh",
-    "firm",
-    "unstable",
-    "disappointing",
-    "hate",
-    "issue",
-    "problem",
-    "blister",
-    "pain",
-  ];
-
-  const positiveCount = positiveSignals.filter((signal) => haystack.includes(signal)).length;
-  const negativeCount = negativeSignals.filter((signal) => haystack.includes(signal)).length;
-
-  if (positiveCount >= negativeCount + 2) {
-    return "positive" as const;
-  }
-
-  if (negativeCount >= positiveCount + 2) {
-    return "negative" as const;
-  }
-
-  return "mixed" as const;
-}
-
-function cleanText(value: string) {
-  return value.replace(/\s+/g, " ").trim();
-}
-
 function unixToDate(value: number | undefined) {
   if (typeof value !== "number") {
     return null;
   }
 
   return new Date(value * 1000);
-}
-
-function normalizeSearchText(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function looksLikeDealPost(title: string) {
