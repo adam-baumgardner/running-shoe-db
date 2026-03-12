@@ -15,7 +15,7 @@ export function getDb() {
   if (!database) {
     client = postgres(databaseUrl, {
       prepare: false,
-      max: 1,
+      max: 5,
     });
 
     database = drizzle(client, { schema });

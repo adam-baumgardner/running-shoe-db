@@ -24,6 +24,7 @@ interface BelieveInTheRunCandidate {
   sourceUrl: string;
   title: string;
   excerpt: string;
+  publishedAt: Date | null;
   rawHtmlSnippet?: string;
 }
 
@@ -84,24 +85,11 @@ export async function runBelieveInTheRunImport({
   }
 
   try {
-    const searchUrl = believeInTheRunImporter.buildSearchUrl({
+    const candidates = await discoverBelieveInTheRunCandidates({
       brandName: selected.brandName,
-      shoeName: selected.versionName,
+      versionName: selected.versionName,
+      query,
     });
-    const response = await fetch(searchUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (compatible; StrideStackBot/0.1; +https://stride-stack.vercel.app)",
-      },
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`Believe in the Run search request failed with ${response.status}`);
-    }
-
-    const html = await response.text();
-    const candidates = extractBelieveInTheRunCandidates(html, query);
 
     let storedCount = 0;
     for (const candidate of candidates) {
@@ -196,52 +184,103 @@ async function getBelieveInTheRunSourceId() {
   return source?.id ?? null;
 }
 
-function extractBelieveInTheRunCandidates(html: string, query: string) {
-  const $ = cheerio.load(html);
-  const urls = new Set<string>();
-  const queryTokens = query
-    .toLowerCase()
-    .split(/\s+/)
-    .map((token) => token.replace(/[^a-z0-9]/g, ""))
-    .filter((token) => token.length >= 3);
-  const results: BelieveInTheRunCandidate[] = [];
+async function discoverBelieveInTheRunCandidates({
+  brandName,
+  versionName,
+  query,
+}: {
+  brandName: string;
+  versionName: string;
+  query: string;
+}) {
+  const sitemapUrls = await getBelieveInTheRunSitemapUrls();
+  const allEntries = await Promise.all(sitemapUrls.map(fetchBelieveInTheRunSitemapEntries));
+  const entries = allEntries.flat();
 
-  $("article").each((_, article) => {
-    const root = $(article);
-    const link = root.find("h2 a, h3 a, a[rel='bookmark']").first();
-    const href = normalizeBelieveInTheRunUrl(link.attr("href"));
-    const title = cleanText(link.text());
-    const excerpt = cleanText(root.find("p").first().text());
+  const normalizedBrand = normalizeSearchText(brandName);
+  const normalizedModelPhrase = normalizeSearchText(versionName);
+  const normalizedQuery = normalizeSearchText(query);
 
-    if (!href || !title || urls.has(href)) {
-      return;
-    }
+  return entries
+    .filter((entry) => entry.url.includes("/shoe-reviews/"))
+    .filter((entry) => {
+      const haystack = normalizeSearchText(`${entry.url} ${entry.title}`);
 
-    if (!href.startsWith("https://believeintherun.com/")) {
-      return;
-    }
+      if (!haystack.includes(normalizedModelPhrase)) {
+        return false;
+      }
 
-    if (href.includes("/event/") || href.includes("/tag/") || href.includes("/category/")) {
-      return;
-    }
+      if (!haystack.includes(normalizedBrand)) {
+        return false;
+      }
 
-    const haystack = `${title} ${excerpt}`.toLowerCase();
-    const matchingTokens = queryTokens.filter((token) => haystack.includes(token));
+      if (looksLikeNonReviewSlug(entry.url)) {
+        return false;
+      }
 
-    if (matchingTokens.length < Math.min(2, queryTokens.length)) {
-      return;
-    }
+      return haystack.includes(normalizedQuery) || haystack.includes(normalizedModelPhrase);
+    })
+    .slice(0, 10)
+    .map((entry) => ({
+      sourceUrl: entry.url,
+      title: entry.title,
+      excerpt: "",
+      publishedAt: entry.lastmod,
+    }));
+}
 
-    urls.add(href);
-    results.push({
-      sourceUrl: href,
-      title,
-      excerpt,
-      rawHtmlSnippet: $.html(article).slice(0, 4000),
-    });
+async function getBelieveInTheRunSitemapUrls() {
+  const response = await fetch("https://believeintherun.com/sitemap_index.xml", {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; StrideStackBot/0.1; +https://stride-stack.vercel.app)",
+    },
+    cache: "no-store",
   });
 
-  return results.slice(0, 10);
+  if (!response.ok) {
+    throw new Error(`Believe in the Run sitemap index request failed with ${response.status}`);
+  }
+
+  const xml = await response.text();
+
+  return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)]
+    .map((match) => match[1])
+    .filter((url) => /\/shoe-sitemap\d*\.xml$/.test(url));
+}
+
+async function fetchBelieveInTheRunSitemapEntries(sitemapUrl: string) {
+  const response = await fetch(sitemapUrl, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (compatible; StrideStackBot/0.1; +https://stride-stack.vercel.app)",
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Believe in the Run sitemap request failed with ${response.status}`);
+  }
+
+  const xml = await response.text();
+  const urlBlocks = [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((match) => match[1]);
+
+  return urlBlocks
+    .map((block) => {
+      const loc = block.match(/<loc>([^<]+)<\/loc>/)?.[1];
+      const lastmodRaw = block.match(/<lastmod>([^<]+)<\/lastmod>/)?.[1];
+
+      if (!loc) {
+        return null;
+      }
+
+      return {
+        url: loc,
+        title: humanizeBelieveInTheRunSlug(loc),
+        lastmod: parsePublishedDate(lastmodRaw),
+      };
+    })
+    .filter((entry): entry is { url: string; title: string; lastmod: Date | null } => Boolean(entry));
 }
 
 async function fetchBelieveInTheRunArticle(candidate: BelieveInTheRunCandidate) {
@@ -291,8 +330,8 @@ async function fetchBelieveInTheRunArticle(candidate: BelieveInTheRunCandidate) 
     sourceUrl: candidate.sourceUrl,
     title,
     authorName: authorName || undefined,
-    publishedAt,
-    summary: summary || candidate.excerpt || title,
+    publishedAt: publishedAt ?? candidate.publishedAt,
+    summary: summary || schema?.description || candidate.excerpt || title,
     body: bodyText || schema?.description || candidate.excerpt || title,
     scoreNormalized100: score?.scoreNormalized100 ?? null,
     originalScoreValue: score?.originalScoreValue ?? null,
@@ -447,7 +486,7 @@ function enrichFallbackCandidate(candidate: BelieveInTheRunCandidate) {
     sourceUrl: candidate.sourceUrl,
     title: candidate.title,
     authorName: undefined,
-    publishedAt: null,
+    publishedAt: candidate.publishedAt,
     summary: candidate.excerpt || candidate.title,
     body: candidate.excerpt || candidate.title,
     scoreNormalized100: null,
@@ -458,14 +497,18 @@ function enrichFallbackCandidate(candidate: BelieveInTheRunCandidate) {
   };
 }
 
-function normalizeBelieveInTheRunUrl(url: string | undefined) {
-  if (!url) return null;
+function humanizeBelieveInTheRunSlug(url: string) {
+  const slug = url
+    .replace(/^https:\/\/believeintherun\.com\/shoe-reviews\//, "")
+    .replace(/\/$/, "")
+    .split("/")
+    .pop();
 
-  try {
-    return new URL(url, "https://believeintherun.com").toString();
-  } catch {
-    return null;
+  if (!slug) {
+    return url;
   }
+
+  return cleanText(slug.replace(/-/g, " "));
 }
 
 function parsePublishedDate(value: string | undefined) {
@@ -509,6 +552,30 @@ function looksLikeUiChrome(text: string) {
     normalized.includes("shop") ||
     normalized.includes("podcast")
   );
+}
+
+function looksLikeNonReviewSlug(url: string) {
+  const normalized = normalizeSearchText(url);
+  const nonReviewSignals = [
+    "best ",
+    "preview",
+    "drops",
+    "sale",
+    "currently running",
+    "weekly rundown",
+    "blue jean mile",
+    "believe in the run austin",
+  ];
+
+  return nonReviewSignals.some((signal) => normalized.includes(signal));
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function cleanText(value: string) {

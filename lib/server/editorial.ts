@@ -164,7 +164,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .innerJoin(shoeReleases, eq(reviews.releaseId, shoeReleases.id))
         .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
         .innerJoin(reviewSources, eq(reviews.sourceId, reviewSources.id))
-        .orderBy(desc(reviews.createdAt)),
+        .orderBy(desc(reviews.createdAt))
+        .limit(20),
       db
         .select({
           id: shoeReleases.id,
@@ -178,7 +179,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .from(shoeReleases)
         .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
         .leftJoin(shoeSpecs, eq(shoeSpecs.releaseId, shoeReleases.id))
-        .orderBy(desc(shoeReleases.releaseYear), shoes.name),
+        .orderBy(desc(shoeReleases.releaseYear), shoes.name)
+        .limit(20),
       db
         .select({
           id: crawlSources.id,
@@ -207,7 +209,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .from(crawlRuns)
         .innerJoin(crawlSources, eq(crawlRuns.crawlSourceId, crawlSources.id))
         .innerJoin(reviewSources, eq(crawlSources.reviewSourceId, reviewSources.id))
-        .orderBy(desc(crawlRuns.createdAt)),
+        .orderBy(desc(crawlRuns.createdAt))
+        .limit(20),
     ]);
 
   const latestStatusBySourceId = new Map<string, EditorialDashboardData["crawlSources"][number]["latestRunStatus"]>();

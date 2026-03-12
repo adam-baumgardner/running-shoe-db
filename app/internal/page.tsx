@@ -14,7 +14,36 @@ import { getEditorialDashboardData } from "@/lib/server/editorial";
 export const dynamic = "force-dynamic";
 
 export default async function InternalPage() {
-  const data = await getEditorialDashboardData();
+  let data: Awaited<ReturnType<typeof getEditorialDashboardData>> | null = null;
+  let errorMessage: string | null = null;
+
+  try {
+    data = await getEditorialDashboardData();
+  } catch (error) {
+    errorMessage = error instanceof Error ? error.message : "Unknown internal dashboard error";
+  }
+
+  if (errorMessage || !data) {
+    return (
+      <main className="page-shell">
+        <section className="hero">
+          <div>
+            <p className="eyebrow">Internal</p>
+            <h1>Internal dashboard is temporarily unavailable.</h1>
+            <p className="hero-copy">
+              The route is protected correctly, but the dashboard failed while loading server data.
+            </p>
+          </div>
+        </section>
+
+        <section className="detail-panel">
+          <p className="feature-kicker">Server Error</p>
+          <h2>Dashboard data fetch failed</h2>
+          <p className="catalog-copy">{errorMessage ?? "Unknown internal dashboard error"}</p>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="page-shell">
@@ -23,8 +52,8 @@ export default async function InternalPage() {
           <p className="eyebrow">Internal</p>
           <h1>Editorial operations for sources, intake, and moderation.</h1>
           <p className="hero-copy">
-            This is the first internal dashboard. It is intentionally narrow: manage review sources,
-            queue manual reviews, and moderate what becomes public.
+            This is the first internal dashboard. It is intentionally narrow: manage review
+            sources, queue manual reviews, and moderate what becomes public.
           </p>
         </div>
       </section>
