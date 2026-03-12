@@ -136,55 +136,47 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
 
   const db = getDb();
 
-  const [
-    brandCountRow,
-    shoeCountRow,
-    sourceCountRow,
-    reviewCountRow,
-    pendingCountRow,
-    brandRows,
-    shoeRows,
-    releaseRows,
-    sourceRows,
-    reviewRows,
-    recentReleaseRows,
-    coverageRows,
-    crawlSourceRows,
-    crawlRunRows,
-  ] =
+  const [brandCountRow, shoeCountRow, sourceCountRow, reviewCountRow, pendingCountRow] =
     await Promise.all([
       db.select({ count: count(brands.id) }).from(brands),
       db.select({ count: count(shoes.id) }).from(shoes),
       db.select({ count: count(reviewSources.id) }).from(reviewSources),
       db.select({ count: count(reviews.id) }).from(reviews),
       db.select({ count: count(reviews.id) }).from(reviews).where(eq(reviews.status, "pending")),
-      db.select({ id: brands.id, name: brands.name }).from(brands).orderBy(brands.name),
-      db
-        .select({
-          id: shoes.id,
-          brandName: brands.name,
-          shoeName: shoes.name,
-        })
-        .from(shoes)
-        .innerJoin(brands, eq(shoes.brandId, brands.id))
-        .orderBy(brands.name, shoes.name),
-      db
-        .select({
-          id: shoeReleases.id,
-          shoeName: shoes.name,
-          versionName: shoeReleases.versionName,
-        })
-        .from(shoeReleases)
-        .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
-        .orderBy(desc(shoeReleases.releaseYear), shoes.name),
-      db
-        .select({
-          id: reviewSources.id,
-          name: reviewSources.name,
-          sourceType: reviewSources.sourceType,
-        })
-        .from(reviewSources)
-        .orderBy(reviewSources.name),
+    ]);
+
+  const [brandRows, shoeRows, releaseRows, sourceRows] = await Promise.all([
+    db.select({ id: brands.id, name: brands.name }).from(brands).orderBy(brands.name),
+    db
+      .select({
+        id: shoes.id,
+        brandName: brands.name,
+        shoeName: shoes.name,
+      })
+      .from(shoes)
+      .innerJoin(brands, eq(shoes.brandId, brands.id))
+      .orderBy(brands.name, shoes.name),
+    db
+      .select({
+        id: shoeReleases.id,
+        shoeName: shoes.name,
+        versionName: shoeReleases.versionName,
+      })
+      .from(shoeReleases)
+      .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+      .orderBy(desc(shoeReleases.releaseYear), shoes.name),
+    db
+      .select({
+        id: reviewSources.id,
+        name: reviewSources.name,
+        sourceType: reviewSources.sourceType,
+      })
+      .from(reviewSources)
+      .orderBy(reviewSources.name),
+  ]);
+
+  const [reviewRows, recentReleaseRows, coverageRows, crawlSourceRows, crawlRunRows] =
+    await Promise.all([
       db
         .select({
           id: reviews.id,
