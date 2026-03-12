@@ -30,3 +30,11 @@ The `/internal` route is protected with HTTP Basic Auth driven by:
 - `INTERNAL_BASIC_AUTH_PASSWORD`
 
 In local development, the route remains open if those variables are unset. In production, the route should always have both values configured.
+
+## Scheduled ingestion
+
+The first automated crawl loop is now exposed at `/api/cron/ingest`.
+
+- Vercel cron is configured in [vercel.json](/Users/adambaumgardner/Documents/Documents/Django/running-shoe-db/vercel.json)
+- `CRON_SECRET` can be used for authenticated manual calls
+- crawl source cadence and active state are managed from `/internal`

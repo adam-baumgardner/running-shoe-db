@@ -5,6 +5,8 @@ import {
   createShoeModelAction,
   runBelieveInTheRunCrawlAction,
   runRedditRunningShoeGeeksCrawlAction,
+  runScheduledIngestionAction,
+  updateCrawlSourceSettingsAction,
   updateReviewEditorialOverridesAction,
   updateReviewStatusAction,
   upsertReleaseAction,
@@ -351,6 +353,11 @@ export default async function InternalPage() {
       <section className="detail-panel editorial-table-panel">
         <p className="feature-kicker">Ingestion Targets</p>
         <h2>Automated crawl foundation</h2>
+        <form action={runScheduledIngestionAction}>
+          <button className="button-primary" type="submit">
+            Run due crawls
+          </button>
+        </form>
         <div className="detail-grid">
           <form action={runBelieveInTheRunCrawlAction} className="editorial-form editorial-form-inline">
             <label className="filter-field">
@@ -413,13 +420,33 @@ export default async function InternalPage() {
                   <strong>{importer?.label ?? source.importerKey}</strong>
                   <p className="detail-muted">{importer?.description ?? "Importer pending."}</p>
                 </div>
-                <div>
+              <div>
                   <a className="text-link" href={source.targetUrl} rel="noreferrer" target="_blank">
                     Open target
                   </a>
                   <p className="detail-muted">Search pattern: {source.searchPattern ?? "None"}</p>
                 </div>
-                <div>{source.cadenceLabel ?? "Unset"}</div>
+                <div>
+                  <form action={updateCrawlSourceSettingsAction} className="editorial-form">
+                    <input name="crawlSourceId" type="hidden" value={source.id} />
+                    <label className="filter-field">
+                      <span>Cadence</span>
+                      <select defaultValue={source.cadenceLabel ?? "manual"} name="cadenceLabel">
+                        <option value="manual">Manual</option>
+                        <option value="hourly">Hourly</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                      </select>
+                    </label>
+                    <label className="filter-field checkbox-field">
+                      <span>Active</span>
+                      <input defaultChecked={source.isActive} name="isActive" type="checkbox" />
+                    </label>
+                    <button className="button-secondary" type="submit">
+                      Save source
+                    </button>
+                  </form>
+                </div>
                 <div>
                   <span className="pill">{source.latestRunStatus ?? "never-run"}</span>
                 </div>

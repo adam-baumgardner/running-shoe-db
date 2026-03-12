@@ -5,7 +5,17 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { runBelieveInTheRunImport } from "@/lib/ingestion/believe-in-the-run-runner";
 import { runRedditRunningShoeGeeksImport } from "@/lib/ingestion/reddit-running-shoe-geeks-runner";
-import { brands, reviewAuthors, reviews, reviewSources, shoeReleases, shoes, shoeSpecs } from "@/db/schema";
+import { runScheduledIngestion } from "@/lib/ingestion/scheduler";
+import {
+  brands,
+  crawlSources,
+  reviewAuthors,
+  reviews,
+  reviewSources,
+  shoeReleases,
+  shoes,
+  shoeSpecs,
+} from "@/db/schema";
 
 function requireDatabase() {
   if (!process.env.DATABASE_URL) {
@@ -318,6 +328,19 @@ export async function updateReviewEditorialOverridesAction(formData: FormData) {
     delete existingMetadata.duplicateOfReviewId;
   }
 
+  const overrideHistory = Array.isArray(existingMetadata.editorialOverrideHistory)
+    ? [...(existingMetadata.editorialOverrideHistory as unknown[])]
+    : [];
+
+  overrideHistory.push({
+    timestamp: new Date().toISOString(),
+    sentiment,
+    highlights,
+    duplicateOfReviewId,
+  });
+
+  existingMetadata.editorialOverrideHistory = overrideHistory.slice(-10);
+
   await db
     .update(reviews)
     .set({
@@ -326,6 +349,35 @@ export async function updateReviewEditorialOverridesAction(formData: FormData) {
       status: duplicateOfReviewId ? "flagged" : review.status,
     })
     .where(eq(reviews.id, reviewId));
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
+export async function updateCrawlSourceSettingsAction(formData: FormData) {
+  const db = requireDatabase();
+  const crawlSourceId = String(formData.get("crawlSourceId") ?? "").trim();
+  const cadenceLabel = String(formData.get("cadenceLabel") ?? "").trim();
+  const isActive = formData.get("isActive") === "on";
+
+  if (!crawlSourceId) {
+    throw new Error("Crawl source id is required.");
+  }
+
+  await db
+    .update(crawlSources)
+    .set({
+      cadenceLabel: cadenceLabel || null,
+      isActive,
+    })
+    .where(eq(crawlSources.id, crawlSourceId));
+
+  revalidatePath("/internal");
+}
+
+export async function runScheduledIngestionAction() {
+  requireDatabase();
+  await runScheduledIngestion();
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
