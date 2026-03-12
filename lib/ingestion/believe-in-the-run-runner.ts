@@ -34,6 +34,7 @@ interface BelieveInTheRunCandidate {
   title: string;
   excerpt: string;
   publishedAt: Date | null;
+  confidence: number;
   rawHtmlSnippet?: string;
 }
 
@@ -93,19 +94,26 @@ export async function runBelieveInTheRunImport({
     throw new Error("Unable to create crawl run.");
   }
 
+  let failureStage = "discovery";
+
   try {
     const candidates = await discoverBelieveInTheRunCandidates({
       brandName: selected.brandName,
       versionName: selected.versionName,
       query,
     });
+    const averageCandidateConfidence = getAverageConfidence(candidates);
+    const maxCandidateConfidence = getMaxConfidence(candidates);
 
     let storedCount = 0;
     for (const candidate of candidates) {
+      failureStage = "article-fetch";
       const enriched = await fetchBelieveInTheRunArticle(candidate);
       const authorId = await getOrCreateReviewAuthor(selected.sourceId, enriched.authorName);
       const titleFingerprint = buildTitleFingerprint(enriched.title);
+      const importerConfidence = getBelieveInTheRunConfidence(candidate, enriched.summary, enriched.body);
 
+      failureStage = "raw-document-persist";
       await db
         .insert(rawDocuments)
         .values({
@@ -125,10 +133,12 @@ export async function runBelieveInTheRunImport({
             originalScoreScale: enriched.originalScoreScale,
             highlights: enriched.highlights,
             titleFingerprint,
+            importerConfidence,
           },
         })
         .onConflictDoNothing();
 
+      failureStage = "review-dedupe";
       const existingReview = await findPotentialDuplicateReview({
         releaseId: selected.releaseId,
         sourceId: selected.sourceId,
@@ -137,6 +147,7 @@ export async function runBelieveInTheRunImport({
       });
 
       if (!existingReview) {
+        failureStage = "review-insert";
         await db.insert(reviews).values({
           releaseId: selected.releaseId,
           sourceId: selected.sourceId,
@@ -158,6 +169,7 @@ export async function runBelieveInTheRunImport({
             authorName: enriched.authorName,
             highlights: enriched.highlights,
             titleFingerprint,
+            importerConfidence,
           },
         });
         storedCount += 1;
@@ -171,6 +183,14 @@ export async function runBelieveInTheRunImport({
         discoveredCount: candidates.length,
         storedCount,
         finishedAt: new Date(),
+        metadata: {
+          importer: believeInTheRunImporter.key,
+          discoveryStrategy: "sitemap",
+          averageCandidateConfidence,
+          maxCandidateConfidence,
+          failureStage: null,
+          noHitReason: candidates.length === 0 ? "no matching review urls found in sitemap" : null,
+        },
       })
       .where(eq(crawlRuns.id, crawlRunId));
 
@@ -186,6 +206,10 @@ export async function runBelieveInTheRunImport({
         status: "failed",
         errorMessage: error instanceof Error ? error.message : "Unknown crawl error",
         finishedAt: new Date(),
+        metadata: {
+          importer: believeInTheRunImporter.key,
+          failureStage,
+        },
       })
       .where(eq(crawlRuns.id, crawlRunId));
     throw error;
@@ -243,6 +267,13 @@ async function discoverBelieveInTheRunCandidates({
       title: entry.title,
       excerpt: "",
       publishedAt: entry.lastmod,
+      confidence: getSitemapMatchConfidence({
+        url: entry.url,
+        title: entry.title,
+        normalizedBrand,
+        normalizedModelPhrase,
+        normalizedQuery,
+      }),
     }));
 }
 
@@ -543,6 +574,81 @@ function enrichFallbackCandidate(candidate: BelieveInTheRunCandidate) {
     highlights: extractHighlights([candidate.excerpt || candidate.title]),
     rawHtml: candidate.rawHtmlSnippet || "",
   };
+}
+
+function getSitemapMatchConfidence({
+  url,
+  title,
+  normalizedBrand,
+  normalizedModelPhrase,
+  normalizedQuery,
+}: {
+  url: string;
+  title: string;
+  normalizedBrand: string;
+  normalizedModelPhrase: string;
+  normalizedQuery: string;
+}) {
+  const haystack = normalizeSearchText(`${url} ${title}`);
+  let score = 0.5;
+
+  if (haystack.includes(normalizedBrand)) {
+    score += 0.15;
+  }
+
+  if (haystack.includes(normalizedModelPhrase)) {
+    score += 0.2;
+  }
+
+  if (haystack.includes(normalizedQuery)) {
+    score += 0.1;
+  }
+
+  if (url.includes("/shoe-reviews/")) {
+    score += 0.05;
+  }
+
+  return clampConfidence(score);
+}
+
+function getBelieveInTheRunConfidence(candidate: BelieveInTheRunCandidate, summary: string, body: string) {
+  let score = candidate.confidence;
+  const combined = cleanText(`${summary} ${body}`);
+
+  if (combined.length >= 600) {
+    score += 0.1;
+  }
+
+  if (combined.length >= 1200) {
+    score += 0.05;
+  }
+
+  if (extractHighlights([combined]).length > 0) {
+    score += 0.05;
+  }
+
+  return clampConfidence(score);
+}
+
+function getAverageConfidence(candidates: Array<{ confidence: number }>) {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const sum = candidates.reduce((total, candidate) => total + candidate.confidence, 0);
+  return Number((sum / candidates.length).toFixed(2));
+}
+
+function getMaxConfidence(candidates: Array<{ confidence: number }>) {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return Number(Math.max(...candidates.map((candidate) => candidate.confidence)).toFixed(2));
+}
+
+function clampConfidence(value: number) {
+  return Number(Math.max(0, Math.min(1, value)).toFixed(2));
 }
 
 function humanizeBelieveInTheRunSlug(url: string) {

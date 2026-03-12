@@ -36,6 +36,7 @@ export interface EditorialReviewRow {
   sourceName: string;
   highlights: string[];
   duplicateOfReviewId: string | null;
+  importerConfidence: number | null;
 }
 
 export interface EditorialDashboardData {
@@ -83,6 +84,10 @@ export interface EditorialDashboardData {
     storedCount: number;
     errorMessage: string | null;
     createdAt: Date;
+    averageCandidateConfidence: number | null;
+    maxCandidateConfidence: number | null;
+    failureStage: string | null;
+    noHitReason: string | null;
   }>;
   recentOverrideEvents: Array<{
     reviewId: string;
@@ -226,6 +231,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
           discoveredCount: crawlRuns.discoveredCount,
           storedCount: crawlRuns.storedCount,
           errorMessage: crawlRuns.errorMessage,
+          metadata: crawlRuns.metadata,
           createdAt: crawlRuns.createdAt,
         })
         .from(crawlRuns)
@@ -292,6 +298,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       sourceName: review.sourceName,
       highlights: getEditorialHighlights(review.metadata),
       duplicateOfReviewId: getDuplicateOfReviewId(review.metadata),
+      importerConfidence: getImporterConfidence(review.metadata),
     })),
     recentReleases: recentReleaseRows.map((release) => ({
       id: release.id,
@@ -335,6 +342,10 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       storedCount: run.storedCount,
       errorMessage: run.errorMessage,
       createdAt: run.createdAt,
+      averageCandidateConfidence: getCrawlRunNumber(run.metadata, "averageCandidateConfidence"),
+      maxCandidateConfidence: getCrawlRunNumber(run.metadata, "maxCandidateConfidence"),
+      failureStage: getCrawlRunString(run.metadata, "failureStage"),
+      noHitReason: getCrawlRunString(run.metadata, "noHitReason"),
     })),
     recentOverrideEvents: recentOverrideEvents
       .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
@@ -362,6 +373,33 @@ function getDuplicateOfReviewId(metadata: unknown) {
 
   const value = (metadata as Record<string, unknown>).duplicateOfReviewId;
   return typeof value === "string" ? value : null;
+}
+
+function getImporterConfidence(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+
+  const value = (metadata as Record<string, unknown>).importerConfidence;
+  return typeof value === "number" ? value : null;
+}
+
+function getCrawlRunString(metadata: unknown, key: string) {
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+function getCrawlRunNumber(metadata: unknown, key: string) {
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "number" ? value : null;
 }
 
 function normalizeCadenceLabel(value: string | null) {

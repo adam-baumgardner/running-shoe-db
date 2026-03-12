@@ -482,10 +482,24 @@ export default async function InternalPage() {
                 <strong>{run.sourceName}</strong>
                 <p className="detail-muted">{formatDateTime(run.createdAt)}</p>
                 {run.errorMessage ? <p className="detail-muted">{run.errorMessage}</p> : null}
+                {run.failureStage ? (
+                  <p className="detail-muted">Failure stage: {run.failureStage}</p>
+                ) : null}
+                {run.noHitReason ? <p className="detail-muted">{run.noHitReason}</p> : null}
               </div>
               <div>{run.query ?? "n/a"}</div>
               <div>
                 <span className="pill">{run.status}</span>
+                {run.averageCandidateConfidence !== null ? (
+                  <p className="detail-muted">
+                    Avg confidence: {formatConfidence(run.averageCandidateConfidence)}
+                  </p>
+                ) : null}
+                {run.maxCandidateConfidence !== null ? (
+                  <p className="detail-muted">
+                    Max confidence: {formatConfidence(run.maxCandidateConfidence)}
+                  </p>
+                ) : null}
               </div>
               <div>{run.discoveredCount}</div>
               <div>{run.storedCount}</div>
@@ -571,6 +585,11 @@ export default async function InternalPage() {
                 {review.highlights.length ? (
                   <p className="detail-muted">Highlights: {review.highlights.join(", ")}</p>
                 ) : null}
+                {review.importerConfidence !== null ? (
+                  <p className="detail-muted">
+                    Import confidence: {formatConfidence(review.importerConfidence)}
+                  </p>
+                ) : null}
                 {review.duplicateOfReviewId ? (
                   <p className="detail-muted">Marked duplicate of {review.duplicateOfReviewId}</p>
                 ) : null}
@@ -654,4 +673,8 @@ function formatDateTime(value: Date | string | null) {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatConfidence(value: number) {
+  return `${Math.round(value * 100)}%`;
 }

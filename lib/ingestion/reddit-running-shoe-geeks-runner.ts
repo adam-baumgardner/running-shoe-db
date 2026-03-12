@@ -35,6 +35,7 @@ interface RedditCandidate {
   score: number | null;
   commentCount: number | null;
   publishedAt: Date | null;
+  confidence: number;
   rawJson: RedditPost;
 }
 
@@ -95,6 +96,8 @@ export async function runRedditRunningShoeGeeksImport({
     throw new Error("Unable to create crawl run.");
   }
 
+  let failureStage = "search";
+
   try {
     const response = await fetch(buildRedditSearchJsonUrl(query), {
       headers: {
@@ -115,13 +118,18 @@ export async function runRedditRunningShoeGeeksImport({
       versionName: selected.versionName,
       brandName: selected.brandName,
     });
+    const averageCandidateConfidence = getAverageConfidence(candidates);
+    const maxCandidateConfidence = getMaxConfidence(candidates);
 
     let storedCount = 0;
     for (const candidate of candidates) {
+      failureStage = "thread-fetch";
       const enriched = await fetchRedditThread(candidate);
       const authorId = await getOrCreateReviewAuthor(selected.sourceId, enriched.authorName);
       const titleFingerprint = buildTitleFingerprint(enriched.title);
+      const importerConfidence = getRedditConfidence(candidate, enriched.summary, enriched.topComments);
 
+      failureStage = "raw-document-persist";
       await db
         .insert(rawDocuments)
         .values({
@@ -142,10 +150,12 @@ export async function runRedditRunningShoeGeeksImport({
             sentiment: enriched.sentiment,
             highlights: enriched.highlights,
             titleFingerprint,
+            importerConfidence,
           },
         })
         .onConflictDoNothing();
 
+      failureStage = "review-dedupe";
       const existingReview = await findPotentialDuplicateReview({
         releaseId: selected.releaseId,
         sourceId: selected.sourceId,
@@ -154,6 +164,7 @@ export async function runRedditRunningShoeGeeksImport({
       });
 
       if (!existingReview) {
+        failureStage = "review-insert";
         await db.insert(reviews).values({
           releaseId: selected.releaseId,
           sourceId: selected.sourceId,
@@ -175,6 +186,7 @@ export async function runRedditRunningShoeGeeksImport({
             topComments: enriched.topComments,
             highlights: enriched.highlights,
             titleFingerprint,
+            importerConfidence,
           },
         });
         storedCount += 1;
@@ -188,6 +200,14 @@ export async function runRedditRunningShoeGeeksImport({
         discoveredCount: candidates.length,
         storedCount,
         finishedAt: new Date(),
+        metadata: {
+          importer: redditRunningShoeGeeksImporter.key,
+          discoveryStrategy: "subreddit-search-json",
+          averageCandidateConfidence,
+          maxCandidateConfidence,
+          failureStage: null,
+          noHitReason: candidates.length === 0 ? "no relevant subreddit threads matched query" : null,
+        },
       })
       .where(eq(crawlRuns.id, crawlRunId));
 
@@ -203,6 +223,10 @@ export async function runRedditRunningShoeGeeksImport({
         status: "failed",
         errorMessage: error instanceof Error ? error.message : "Unknown crawl error",
         finishedAt: new Date(),
+        metadata: {
+          importer: redditRunningShoeGeeksImporter.key,
+          failureStage,
+        },
       })
       .where(eq(crawlRuns.id, crawlRunId));
     throw error;
@@ -298,6 +322,7 @@ function extractRedditCandidates(
       score: post.score,
       commentCount: post.commentCount,
       publishedAt: post.publishedAt,
+      confidence: getRedditCandidateConfidence(post),
       rawJson: post.rawJson,
     });
   }
@@ -469,6 +494,78 @@ function buildThreadSummary({
   topComments: string[];
 }) {
   return summarizeParts([body, excerpt, ...topComments], 420);
+}
+
+function getRedditCandidateConfidence(candidate: {
+  title: string;
+  excerpt: string;
+  score: number | null;
+  commentCount: number | null;
+}) {
+  let score = 0.45;
+  const title = normalizeSearchText(candidate.title);
+  const excerpt = normalizeSearchText(candidate.excerpt);
+
+  if (title.includes("review") || title.includes("impressions") || title.includes("thoughts")) {
+    score += 0.2;
+  }
+
+  if (excerpt.length >= 150) {
+    score += 0.1;
+  }
+
+  if ((candidate.commentCount ?? 0) >= 10) {
+    score += 0.1;
+  }
+
+  if ((candidate.score ?? 0) >= 15) {
+    score += 0.05;
+  }
+
+  return clampConfidence(score);
+}
+
+function getRedditConfidence(
+  candidate: RedditCandidate,
+  summary: string,
+  topComments: Array<{ body: string }>,
+) {
+  let score = candidate.confidence;
+
+  if (summary.length >= 250) {
+    score += 0.1;
+  }
+
+  if (topComments.length >= 2) {
+    score += 0.1;
+  }
+
+  if (extractHighlights([summary, ...topComments.map((comment) => comment.body)]).length > 0) {
+    score += 0.05;
+  }
+
+  return clampConfidence(score);
+}
+
+function getAverageConfidence(candidates: Array<{ confidence: number }>) {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const sum = candidates.reduce((total, candidate) => total + candidate.confidence, 0);
+  return Number((sum / candidates.length).toFixed(2));
+}
+
+function getMaxConfidence(candidates: Array<{ confidence: number }>) {
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  return Number(Math.max(...candidates.map((candidate) => candidate.confidence)).toFixed(2));
+}
+
+function clampConfidence(value: number) {
+  return Number(Math.max(0, Math.min(1, value)).toFixed(2));
 }
 
 function buildThreadBody({
