@@ -1,6 +1,7 @@
 import { count, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { brands, crawlRuns, crawlSources, reviewSources, reviews, shoeReleases, shoes, shoeSpecs } from "@/db/schema";
+import { assessCrawlDueState } from "@/lib/ingestion/scheduler";
 
 export interface EditorialBrandOption {
   id: string;
@@ -68,6 +69,10 @@ export interface EditorialDashboardData {
     cadenceLabel: string | null;
     isActive: boolean;
     latestRunStatus: "queued" | "running" | "succeeded" | "partial" | "failed" | null;
+    lastRunAt: Date | null;
+    nextRunAt: Date | null;
+    dueReason: string;
+    isDue: boolean;
   }>;
   recentCrawlRuns: Array<{
     id: string;
@@ -77,6 +82,16 @@ export interface EditorialDashboardData {
     discoveredCount: number;
     storedCount: number;
     errorMessage: string | null;
+    createdAt: Date;
+  }>;
+  recentOverrideEvents: Array<{
+    reviewId: string;
+    reviewTitle: string;
+    releaseLabel: string;
+    timestamp: string;
+    sentiment: string | null;
+    highlights: string[];
+    duplicateOfReviewId: string | null;
   }>;
 }
 
@@ -98,6 +113,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       recentReleases: [],
       crawlSources: [],
       recentCrawlRuns: [],
+      recentOverrideEvents: [],
     };
   }
 
@@ -210,6 +226,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
           discoveredCount: crawlRuns.discoveredCount,
           storedCount: crawlRuns.storedCount,
           errorMessage: crawlRuns.errorMessage,
+          createdAt: crawlRuns.createdAt,
         })
         .from(crawlRuns)
         .innerJoin(crawlSources, eq(crawlRuns.crawlSourceId, crawlSources.id))
@@ -219,11 +236,31 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
     ]);
 
   const latestStatusBySourceId = new Map<string, EditorialDashboardData["crawlSources"][number]["latestRunStatus"]>();
+  const latestRunMetaBySourceId = new Map<
+    string,
+    { status: EditorialDashboardData["crawlSources"][number]["latestRunStatus"]; createdAt: Date }
+  >();
   for (const run of crawlRunRows) {
     if (!latestStatusBySourceId.has(run.crawlSourceId)) {
       latestStatusBySourceId.set(run.crawlSourceId, run.status);
+      latestRunMetaBySourceId.set(run.crawlSourceId, {
+        status: run.status,
+        createdAt: run.createdAt,
+      });
     }
   }
+
+  const recentOverrideEvents = reviewRows.flatMap((review) =>
+    getEditorialOverrideHistory(review.metadata).map((event) => ({
+      reviewId: review.id,
+      reviewTitle: review.title ?? "Untitled review",
+      releaseLabel: `${review.shoeName} ${review.versionName}`,
+      timestamp: event.timestamp,
+      sentiment: event.sentiment,
+      highlights: event.highlights,
+      duplicateOfReviewId: event.duplicateOfReviewId,
+    })),
+  );
 
   return {
     stats: {
@@ -265,15 +302,29 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       dropMm: release.dropMm,
     })),
     crawlSources: crawlSourceRows.map((source) => ({
-      id: source.id,
-      importerKey: source.importerKey,
-      sourceName: source.sourceName,
-      targetType: source.targetType,
-      targetUrl: source.targetUrl,
-      searchPattern: source.searchPattern,
-      cadenceLabel: source.cadenceLabel,
-      isActive: source.isActive,
-      latestRunStatus: latestStatusBySourceId.get(source.id) ?? null,
+      ...(() => {
+        const latestRun = latestRunMetaBySourceId.get(source.id);
+        const cadence = normalizeCadenceLabel(source.cadenceLabel);
+        const dueState = source.isActive
+          ? assessCrawlDueState(cadence, latestRun?.createdAt ?? null)
+          : { isDue: false, reason: "inactive", nextRunAt: null };
+
+        return {
+          id: source.id,
+          importerKey: source.importerKey,
+          sourceName: source.sourceName,
+          targetType: source.targetType,
+          targetUrl: source.targetUrl,
+          searchPattern: source.searchPattern,
+          cadenceLabel: source.cadenceLabel,
+          isActive: source.isActive,
+          latestRunStatus: latestStatusBySourceId.get(source.id) ?? null,
+          lastRunAt: latestRun?.createdAt ?? null,
+          nextRunAt: dueState.nextRunAt,
+          dueReason: dueState.reason,
+          isDue: dueState.isDue,
+        };
+      })(),
     })),
     recentCrawlRuns: crawlRunRows.map((run) => ({
       id: run.id,
@@ -283,7 +334,11 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       discoveredCount: run.discoveredCount,
       storedCount: run.storedCount,
       errorMessage: run.errorMessage,
+      createdAt: run.createdAt,
     })),
+    recentOverrideEvents: recentOverrideEvents
+      .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
+      .slice(0, 12),
   };
 }
 
@@ -307,4 +362,67 @@ function getDuplicateOfReviewId(metadata: unknown) {
 
   const value = (metadata as Record<string, unknown>).duplicateOfReviewId;
   return typeof value === "string" ? value : null;
+}
+
+function normalizeCadenceLabel(value: string | null) {
+  const normalized = value?.trim().toLowerCase();
+
+  if (
+    normalized === "manual" ||
+    normalized === "hourly" ||
+    normalized === "daily" ||
+    normalized === "weekly"
+  ) {
+    return normalized;
+  }
+
+  return "manual";
+}
+
+function getEditorialOverrideHistory(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") {
+    return [];
+  }
+
+  const value = (metadata as Record<string, unknown>).editorialOverrideHistory;
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const record = entry as Record<string, unknown>;
+      const timestamp = typeof record.timestamp === "string" ? record.timestamp : null;
+      const sentiment = typeof record.sentiment === "string" ? record.sentiment : null;
+      const duplicateOfReviewId =
+        typeof record.duplicateOfReviewId === "string" ? record.duplicateOfReviewId : null;
+      const highlights = Array.isArray(record.highlights)
+        ? record.highlights.filter((item): item is string => typeof item === "string").slice(0, 4)
+        : [];
+
+      if (!timestamp) {
+        return null;
+      }
+
+      return {
+        timestamp,
+        sentiment,
+        highlights,
+        duplicateOfReviewId,
+      };
+    })
+    .filter(
+      (
+        entry,
+      ): entry is {
+        timestamp: string;
+        sentiment: string | null;
+        highlights: string[];
+        duplicateOfReviewId: string | null;
+      } => Boolean(entry),
+    );
 }

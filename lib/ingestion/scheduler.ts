@@ -19,6 +19,12 @@ export interface ScheduledIngestionResult {
   }>;
 }
 
+export interface CrawlDueAssessment {
+  isDue: boolean;
+  reason: string;
+  nextRunAt: Date | null;
+}
+
 export async function runScheduledIngestion() {
   const db = getDb();
   const sources = await db
@@ -114,23 +120,44 @@ function normalizeCadenceLabel(value: string | null): SupportedCadence {
   return "manual";
 }
 
-function isRunDue(cadence: SupportedCadence, lastRunAt: Date | null) {
-  if (!lastRunAt) {
-    return true;
+export function assessCrawlDueState(
+  cadence: SupportedCadence,
+  lastRunAt: Date | null,
+): CrawlDueAssessment {
+  if (cadence === "manual") {
+    return {
+      isDue: false,
+      reason: "manual cadence",
+      nextRunAt: null,
+    };
   }
 
-  const elapsedMs = Date.now() - lastRunAt.getTime();
+  if (!lastRunAt) {
+    return {
+      isDue: true,
+      reason: "never run",
+      nextRunAt: null,
+    };
+  }
+
   const thresholds: Record<Exclude<SupportedCadence, "manual">, number> = {
     hourly: 1000 * 60 * 60,
     daily: 1000 * 60 * 60 * 24,
     weekly: 1000 * 60 * 60 * 24 * 7,
   };
+  const thresholdMs = thresholds[cadence];
+  const nextRunAt = new Date(lastRunAt.getTime() + thresholdMs);
+  const isDue = Date.now() >= nextRunAt.getTime();
 
-  if (cadence === "manual") {
-    return false;
-  }
+  return {
+    isDue,
+    reason: isDue ? "due now" : "not due",
+    nextRunAt,
+  };
+}
 
-  return elapsedMs >= thresholds[cadence];
+function isRunDue(cadence: SupportedCadence, lastRunAt: Date | null) {
+  return assessCrawlDueState(cadence, lastRunAt).isDue;
 }
 
 async function runScheduledImporter(importerKey: string, releaseId: string) {

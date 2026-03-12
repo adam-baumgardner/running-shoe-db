@@ -405,7 +405,7 @@ export default async function InternalPage() {
           <div className="editorial-table-head">Importer</div>
           <div className="editorial-table-head">Target</div>
           <div className="editorial-table-head">Cadence</div>
-          <div className="editorial-table-head">Latest run</div>
+          <div className="editorial-table-head">Health</div>
 
           {data.crawlSources.map((source) => {
             const importer = getImporterByKey(source.importerKey);
@@ -449,6 +449,16 @@ export default async function InternalPage() {
                 </div>
                 <div>
                   <span className="pill">{source.latestRunStatus ?? "never-run"}</span>
+                  <p className="detail-muted">
+                    {source.isActive ? (source.isDue ? "Due now" : "On schedule") : "Inactive"} ·{" "}
+                    {source.dueReason}
+                  </p>
+                  <p className="detail-muted">
+                    Last run: {formatDateTime(source.lastRunAt) ?? "Never"}
+                  </p>
+                  <p className="detail-muted">
+                    Next run: {formatDateTime(source.nextRunAt) ?? "Manual trigger only"}
+                  </p>
                 </div>
               </div>
             );
@@ -470,6 +480,7 @@ export default async function InternalPage() {
             <div className="editorial-row" key={run.id}>
               <div>
                 <strong>{run.sourceName}</strong>
+                <p className="detail-muted">{formatDateTime(run.createdAt)}</p>
                 {run.errorMessage ? <p className="detail-muted">{run.errorMessage}</p> : null}
               </div>
               <div>{run.query ?? "n/a"}</div>
@@ -480,6 +491,41 @@ export default async function InternalPage() {
               <div>{run.storedCount}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="detail-panel editorial-table-panel">
+        <p className="feature-kicker">Override History</p>
+        <h2>Recent editorial corrections</h2>
+        <div className="editorial-table editorial-table--runs">
+          <div className="editorial-table-head">Review</div>
+          <div className="editorial-table-head">When</div>
+          <div className="editorial-table-head">Sentiment</div>
+          <div className="editorial-table-head">Highlights</div>
+          <div className="editorial-table-head">Duplicate</div>
+
+          {data.recentOverrideEvents.length ? (
+            data.recentOverrideEvents.map((event) => (
+              <div className="editorial-row" key={`${event.reviewId}-${event.timestamp}`}>
+                <div>
+                  <strong>{event.reviewTitle}</strong>
+                  <p className="detail-muted">{event.releaseLabel}</p>
+                </div>
+                <div>{formatDateTime(event.timestamp)}</div>
+                <div>{event.sentiment ?? "Unset"}</div>
+                <div>{event.highlights.length ? event.highlights.join(", ") : "None"}</div>
+                <div>{event.duplicateOfReviewId ?? "No"}</div>
+              </div>
+            ))
+          ) : (
+            <div className="editorial-row">
+              <div>No overrides yet.</div>
+              <div>n/a</div>
+              <div>n/a</div>
+              <div>n/a</div>
+              <div>n/a</div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -590,4 +636,22 @@ export default async function InternalPage() {
       </section>
     </main>
   );
+}
+
+function formatDateTime(value: Date | string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
