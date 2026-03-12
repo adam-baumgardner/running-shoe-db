@@ -338,7 +338,8 @@ The model is intentionally built so automated ingestion and manual editorial upd
 - secure internal auth model
 - public review submission workflow behind moderation
 - richer release-level recommendation and comparison logic
-- add the next trusted sources, starting with RunRepeat and Doctors of Running
+- expand trusted-source coverage beyond the current live set of Believe in the Run, Reddit, and RunRepeat
+- implement Doctors of Running next
 
 ## 17. Open questions
 

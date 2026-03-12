@@ -5,6 +5,7 @@ import {
   createShoeModelAction,
   runBelieveInTheRunCrawlAction,
   runRedditRunningShoeGeeksCrawlAction,
+  runRunRepeatCrawlAction,
   runScheduledIngestionAction,
   updateCrawlSourceSettingsAction,
   updateReviewEditorialOverridesAction,
@@ -398,6 +399,25 @@ export default async function InternalPage() {
             </label>
             <button className="button-primary" type="submit">
               Run Reddit crawl
+            </button>
+          </form>
+
+          <form action={runRunRepeatCrawlAction} className="editorial-form editorial-form-inline">
+            <label className="filter-field">
+              <span>RunRepeat crawl target</span>
+              <select name="releaseId" required defaultValue="">
+                <option value="" disabled>
+                  Select release to search
+                </option>
+                {data.releases.map((release) => (
+                  <option key={release.id} value={release.id}>
+                    {release.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="button-primary" type="submit">
+              Run RunRepeat crawl
             </button>
           </form>
         </div>

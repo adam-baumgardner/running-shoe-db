@@ -118,6 +118,13 @@ Next queued source targets are:
 - RunRepeat
 - Doctors of Running
 
+Current implementation status:
+
+- Believe in the Run: live importer
+- Reddit `r/RunningShoeGeeks`: live importer
+- RunRepeat: live importer
+- Doctors of Running: planned
+
 The near-term query strategy for both is shoe-name search:
 
 - `Believe in the Run`: search site content for the shoe model name and brand name

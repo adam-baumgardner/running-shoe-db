@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import { runBelieveInTheRunImport } from "@/lib/ingestion/believe-in-the-run-runner";
 import { runRedditRunningShoeGeeksImport } from "@/lib/ingestion/reddit-running-shoe-geeks-runner";
+import { runRunRepeatImport } from "@/lib/ingestion/runrepeat-runner";
 
 type SupportedCadence = "manual" | "hourly" | "daily" | "weekly";
 const MAX_RELEASES_PER_SOURCE = 6;
@@ -221,6 +222,8 @@ async function runScheduledImporter(importerKey: string, releaseId: string) {
       return runBelieveInTheRunImport({ releaseId });
     case "reddit-running-shoe-geeks":
       return runRedditRunningShoeGeeksImport({ releaseId });
+    case "runrepeat":
+      return runRunRepeatImport({ releaseId });
     default:
       return {
         discoveredCount: 0,
