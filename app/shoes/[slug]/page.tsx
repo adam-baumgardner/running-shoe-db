@@ -90,6 +90,31 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
         </article>
 
         <article className="detail-panel">
+          <p className="feature-kicker">Consensus</p>
+          <h2>Cross-source review summary</h2>
+          <p>
+            Built from {shoe.reviewSignalSummary.sourceCount} sources and {shoe.reviewCount} approved
+            reviews for this release.
+          </p>
+          <div className="detail-chip-row">
+            {shoe.reviewSignalSummary.topHighlights.length ? (
+              shoe.reviewSignalSummary.topHighlights.map((highlight) => (
+                <span className="pill" key={highlight.label}>
+                  {highlight.label} x{highlight.count}
+                </span>
+              ))
+            ) : (
+              <span className="pill">No common highlights yet</span>
+            )}
+          </div>
+          <p className="detail-muted">
+            Sentiment: {shoe.reviewSignalSummary.sentimentBreakdown.positive} positive,{" "}
+            {shoe.reviewSignalSummary.sentimentBreakdown.mixed} mixed,{" "}
+            {shoe.reviewSignalSummary.sentimentBreakdown.negative} negative.
+          </p>
+        </article>
+
+        <article className="detail-panel">
           <p className="feature-kicker">Reviews</p>
           <h2>Source-backed review signals</h2>
           <p>

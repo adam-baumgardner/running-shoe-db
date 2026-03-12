@@ -84,6 +84,15 @@ export interface ShoeDetail {
   sourceNotes: string | null;
   reviewCount: number;
   averageReviewScore: number | null;
+  reviewSignalSummary: {
+    topHighlights: Array<{ label: string; count: number }>;
+    sentimentBreakdown: {
+      positive: number;
+      mixed: number;
+      negative: number;
+    };
+    sourceCount: number;
+  };
   reviews: ShoeReviewSummary[];
 }
 
@@ -271,6 +280,20 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       .where(and(eq(reviews.releaseId, row.id), eq(reviews.status, "approved")))
       .orderBy(desc(reviews.publishedAt));
 
+    const mappedReviews = reviewRows.map((review) => ({
+      id: review.id,
+      title: review.title,
+      excerpt: review.excerpt,
+      highlights: getReviewHighlights(review.metadata),
+      scoreNormalized100: review.scoreNormalized100,
+      sentiment: review.sentiment,
+      publishedAt: review.publishedAt ? review.publishedAt.toISOString().slice(0, 10) : null,
+      sourceName: review.sourceName,
+      sourceType: review.sourceType,
+      sourceUrl: review.sourceUrl,
+      authorName: review.authorName,
+    }));
+
     return {
       id: row.id,
       brand: row.brand,
@@ -296,19 +319,8 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       sourceNotes: row.sourceNotes,
       reviewCount: Number(row.reviewCount),
       averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
-      reviews: reviewRows.map((review) => ({
-        id: review.id,
-        title: review.title,
-        excerpt: review.excerpt,
-        highlights: getReviewHighlights(review.metadata),
-        scoreNormalized100: review.scoreNormalized100,
-        sentiment: review.sentiment,
-        publishedAt: review.publishedAt ? review.publishedAt.toISOString().slice(0, 10) : null,
-        sourceName: review.sourceName,
-        sourceType: review.sourceType,
-        sourceUrl: review.sourceUrl,
-        authorName: review.authorName,
-      })),
+      reviewSignalSummary: aggregateReviewSignals(mappedReviews),
+      reviews: mappedReviews,
     };
   } catch {
     return buildFallbackDetail(slug);
@@ -326,6 +338,39 @@ function getReviewHighlights(metadata: unknown) {
   }
 
   return maybeHighlights.filter((value): value is string => typeof value === "string").slice(0, 3);
+}
+
+function aggregateReviewSignals(reviews: ShoeReviewSummary[]) {
+  const highlightCounts = new Map<string, number>();
+  const sentimentBreakdown = {
+    positive: 0,
+    mixed: 0,
+    negative: 0,
+  };
+  const sources = new Set<string>();
+
+  for (const review of reviews) {
+    sources.add(review.sourceName);
+
+    if (review.sentiment) {
+      sentimentBreakdown[review.sentiment] += 1;
+    }
+
+    for (const highlight of review.highlights) {
+      highlightCounts.set(highlight, (highlightCounts.get(highlight) ?? 0) + 1);
+    }
+  }
+
+  const topHighlights = [...highlightCounts.entries()]
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, 4)
+    .map(([label, count]) => ({ label, count }));
+
+  return {
+    topHighlights,
+    sentimentBreakdown,
+    sourceCount: sources.size,
+  };
 }
 
 export async function getComparisonRows(selectedSlugs: string[]): Promise<ComparisonRow[]> {
@@ -475,6 +520,18 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
     sourceNotes: "Fallback data from the design seed set.",
     reviewCount: match.reviewCount,
     averageReviewScore: 82,
+    reviewSignalSummary: {
+      topHighlights: [
+        { label: "Cushioning", count: 1 },
+        { label: "Ride", count: 1 },
+      ],
+      sentimentBreakdown: {
+        positive: 1,
+        mixed: 0,
+        negative: 0,
+      },
+      sourceCount: 1,
+    },
     reviews: [
       {
         id: `${match.id}-review`,
