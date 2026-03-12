@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { runBelieveInTheRunImport } from "@/lib/ingestion/believe-in-the-run-runner";
+import { runDoctorsOfRunningImport } from "@/lib/ingestion/doctors-of-running-runner";
 import { runRedditRunningShoeGeeksImport } from "@/lib/ingestion/reddit-running-shoe-geeks-runner";
 import { runRunRepeatImport } from "@/lib/ingestion/runrepeat-runner";
 import { runScheduledIngestion } from "@/lib/ingestion/scheduler";
@@ -421,6 +422,20 @@ export async function runRunRepeatCrawlAction(formData: FormData) {
   }
 
   await runRunRepeatImport({ releaseId });
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
+export async function runDoctorsOfRunningCrawlAction(formData: FormData) {
+  requireDatabase();
+  const releaseId = String(formData.get("releaseId") ?? "").trim();
+
+  if (!releaseId) {
+    throw new Error("Release is required.");
+  }
+
+  await runDoctorsOfRunningImport({ releaseId });
 
   revalidatePath("/internal");
   revalidatePath("/shoes");

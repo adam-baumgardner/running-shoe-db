@@ -9,6 +9,7 @@ import {
   shoes,
 } from "@/db/schema";
 import { runBelieveInTheRunImport } from "@/lib/ingestion/believe-in-the-run-runner";
+import { runDoctorsOfRunningImport } from "@/lib/ingestion/doctors-of-running-runner";
 import { runRedditRunningShoeGeeksImport } from "@/lib/ingestion/reddit-running-shoe-geeks-runner";
 import { runRunRepeatImport } from "@/lib/ingestion/runrepeat-runner";
 
@@ -222,6 +223,8 @@ async function runScheduledImporter(importerKey: string, releaseId: string) {
       return runBelieveInTheRunImport({ releaseId });
     case "reddit-running-shoe-geeks":
       return runRedditRunningShoeGeeksImport({ releaseId });
+    case "doctors-of-running":
+      return runDoctorsOfRunningImport({ releaseId });
     case "runrepeat":
       return runRunRepeatImport({ releaseId });
     default:

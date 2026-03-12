@@ -123,7 +123,7 @@ Current implementation status:
 - Believe in the Run: live importer
 - Reddit `r/RunningShoeGeeks`: live importer
 - RunRepeat: live importer
-- Doctors of Running: planned
+- Doctors of Running: live importer
 
 The near-term query strategy for both is shoe-name search:
 
