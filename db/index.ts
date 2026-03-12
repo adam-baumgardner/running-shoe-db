@@ -16,6 +16,9 @@ export function getDb() {
     client = postgres(databaseUrl, {
       prepare: false,
       max: 2,
+      ssl: "require",
+      connect_timeout: 10,
+      idle_timeout: 20,
     });
 
     database = drizzle(client, { schema });
