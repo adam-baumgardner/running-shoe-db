@@ -23,6 +23,7 @@ export default async function InternalPage() {
   try {
     data = await getEditorialDashboardData();
   } catch (error) {
+    console.error("Internal dashboard data fetch failed", error);
     errorMessage = error instanceof Error ? error.message : "Unknown internal dashboard error";
   }
 
