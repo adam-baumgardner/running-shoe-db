@@ -85,12 +85,18 @@ export interface ShoeDetail {
   reviewCount: number;
   averageReviewScore: number | null;
   reviewSignalSummary: {
-    topHighlights: Array<{ label: string; count: number }>;
+    topHighlights: Array<{ label: string; count: number; weight: number }>;
     sentimentBreakdown: {
       positive: number;
       mixed: number;
       negative: number;
     };
+    weightedSentiment: {
+      positive: number;
+      mixed: number;
+      negative: number;
+    };
+    dominantSentiment: "positive" | "mixed" | "negative" | null;
     sourceCount: number;
   };
   reviews: ShoeReviewSummary[];
@@ -341,8 +347,13 @@ function getReviewHighlights(metadata: unknown) {
 }
 
 function aggregateReviewSignals(reviews: ShoeReviewSummary[]) {
-  const highlightCounts = new Map<string, number>();
+  const highlightCounts = new Map<string, { count: number; weight: number }>();
   const sentimentBreakdown = {
+    positive: 0,
+    mixed: 0,
+    negative: 0,
+  };
+  const weightedSentiment = {
     positive: 0,
     mixed: 0,
     negative: 0,
@@ -351,26 +362,94 @@ function aggregateReviewSignals(reviews: ShoeReviewSummary[]) {
 
   for (const review of reviews) {
     sources.add(review.sourceName);
+    const reviewWeight = getReviewWeight(review);
 
     if (review.sentiment) {
       sentimentBreakdown[review.sentiment] += 1;
+      weightedSentiment[review.sentiment] += reviewWeight;
     }
 
     for (const highlight of review.highlights) {
-      highlightCounts.set(highlight, (highlightCounts.get(highlight) ?? 0) + 1);
+      const current = highlightCounts.get(highlight) ?? { count: 0, weight: 0 };
+      highlightCounts.set(highlight, {
+        count: current.count + 1,
+        weight: current.weight + reviewWeight,
+      });
     }
   }
 
   const topHighlights = [...highlightCounts.entries()]
-    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .sort(
+      (left, right) =>
+        right[1].weight - left[1].weight || right[1].count - left[1].count || left[0].localeCompare(right[0])
+    )
     .slice(0, 4)
-    .map(([label, count]) => ({ label, count }));
+    .map(([label, value]) => ({
+      label,
+      count: value.count,
+      weight: Number(value.weight.toFixed(2)),
+    }));
+
+  const dominantSentiment = getDominantSentiment(weightedSentiment);
 
   return {
     topHighlights,
     sentimentBreakdown,
+    weightedSentiment: {
+      positive: Number(weightedSentiment.positive.toFixed(2)),
+      mixed: Number(weightedSentiment.mixed.toFixed(2)),
+      negative: Number(weightedSentiment.negative.toFixed(2)),
+    },
+    dominantSentiment,
     sourceCount: sources.size,
   };
+}
+
+function getReviewWeight(review: ShoeReviewSummary) {
+  const sourceWeight = review.sourceType === "editorial" ? 1 : review.sourceType === "reddit" ? 0.7 : 0.55;
+  const freshnessWeight = getFreshnessWeight(review.publishedAt);
+  return sourceWeight * freshnessWeight;
+}
+
+function getFreshnessWeight(publishedAt: string | null) {
+  if (!publishedAt) {
+    return 0.65;
+  }
+
+  const published = new Date(publishedAt);
+  if (Number.isNaN(published.getTime())) {
+    return 0.65;
+  }
+
+  const daysOld = (Date.now() - published.getTime()) / (1000 * 60 * 60 * 24);
+  if (daysOld <= 120) {
+    return 1;
+  }
+
+  if (daysOld <= 365) {
+    return 0.85;
+  }
+
+  if (daysOld <= 730) {
+    return 0.7;
+  }
+
+  return 0.55;
+}
+
+function getDominantSentiment(weightedSentiment: {
+  positive: number;
+  mixed: number;
+  negative: number;
+}) {
+  const entries = Object.entries(weightedSentiment) as Array<["positive" | "mixed" | "negative", number]>;
+  const sorted = entries.sort((left, right) => right[1] - left[1]);
+
+  if (!sorted[0] || sorted[0][1] <= 0) {
+    return null;
+  }
+
+  return sorted[0][0];
 }
 
 export async function getComparisonRows(selectedSlugs: string[]): Promise<ComparisonRow[]> {
@@ -522,14 +601,20 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
     averageReviewScore: 82,
     reviewSignalSummary: {
       topHighlights: [
-        { label: "Cushioning", count: 1 },
-        { label: "Ride", count: 1 },
+        { label: "Cushioning", count: 1, weight: 1 },
+        { label: "Ride", count: 1, weight: 1 },
       ],
       sentimentBreakdown: {
         positive: 1,
         mixed: 0,
         negative: 0,
       },
+      weightedSentiment: {
+        positive: 1,
+        mixed: 0,
+        negative: 0,
+      },
+      dominantSentiment: "positive",
       sourceCount: 1,
     },
     reviews: [

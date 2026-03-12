@@ -116,3 +116,33 @@ export function extractHighlights(texts: string[], maxHighlights = 3) {
 
   return highlights;
 }
+
+export function buildTitleFingerprint(value: string) {
+  return normalizeSearchText(value)
+    .split(" ")
+    .filter((token) => token.length > 1)
+    .join(" ");
+}
+
+export function areFingerprintsSimilar(left: string, right: string) {
+  if (!left || !right) {
+    return false;
+  }
+
+  if (left === right) {
+    return true;
+  }
+
+  const leftTokens = new Set(left.split(" "));
+  const rightTokens = new Set(right.split(" "));
+  let overlap = 0;
+
+  for (const token of leftTokens) {
+    if (rightTokens.has(token)) {
+      overlap += 1;
+    }
+  }
+
+  const minSize = Math.min(leftTokens.size, rightTokens.size);
+  return minSize > 0 && overlap >= Math.max(2, minSize - 1);
+}

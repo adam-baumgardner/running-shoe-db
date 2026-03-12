@@ -15,6 +15,8 @@ import {
 } from "@/db/schema";
 import { believeInTheRunImporter } from "@/lib/ingestion/believe-in-the-run";
 import {
+  areFingerprintsSimilar,
+  buildTitleFingerprint,
   cleanText,
   deriveSentiment,
   extractHighlights,
@@ -102,6 +104,7 @@ export async function runBelieveInTheRunImport({
     for (const candidate of candidates) {
       const enriched = await fetchBelieveInTheRunArticle(candidate);
       const authorId = await getOrCreateReviewAuthor(selected.sourceId, enriched.authorName);
+      const titleFingerprint = buildTitleFingerprint(enriched.title);
 
       await db
         .insert(rawDocuments)
@@ -121,12 +124,16 @@ export async function runBelieveInTheRunImport({
             originalScoreValue: enriched.originalScoreValue,
             originalScoreScale: enriched.originalScoreScale,
             highlights: enriched.highlights,
+            titleFingerprint,
           },
         })
         .onConflictDoNothing();
 
-      const existingReview = await db.query.reviews.findFirst({
-        where: eq(reviews.sourceUrl, enriched.sourceUrl),
+      const existingReview = await findPotentialDuplicateReview({
+        releaseId: selected.releaseId,
+        sourceId: selected.sourceId,
+        sourceUrl: enriched.sourceUrl,
+        titleFingerprint,
       });
 
       if (!existingReview) {
@@ -150,6 +157,7 @@ export async function runBelieveInTheRunImport({
             query,
             authorName: enriched.authorName,
             highlights: enriched.highlights,
+            titleFingerprint,
           },
         });
         storedCount += 1;
@@ -486,6 +494,38 @@ async function getOrCreateReviewAuthor(sourceId: string, authorName: string | un
     .returning({ id: reviewAuthors.id });
 
   return inserted[0]?.id ?? null;
+}
+
+async function findPotentialDuplicateReview({
+  releaseId,
+  sourceId,
+  sourceUrl,
+  titleFingerprint,
+}: {
+  releaseId: string;
+  sourceId: string;
+  sourceUrl: string;
+  titleFingerprint: string;
+}) {
+  const db = getDb();
+  const existing = await db.query.reviews.findMany({
+    where: and(eq(reviews.releaseId, releaseId), eq(reviews.sourceId, sourceId)),
+  });
+
+  return existing.find((review) => {
+    if (review.sourceUrl === sourceUrl) {
+      return true;
+    }
+
+    const existingFingerprint =
+      typeof review.metadata === "object" &&
+      review.metadata &&
+      typeof (review.metadata as Record<string, unknown>).titleFingerprint === "string"
+        ? ((review.metadata as Record<string, unknown>).titleFingerprint as string)
+        : buildTitleFingerprint(review.title ?? "");
+
+    return areFingerprintsSimilar(existingFingerprint, titleFingerprint);
+  });
 }
 
 function enrichFallbackCandidate(candidate: BelieveInTheRunCandidate) {

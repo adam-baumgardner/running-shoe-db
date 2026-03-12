@@ -96,6 +96,9 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
             Built from {shoe.reviewSignalSummary.sourceCount} sources and {shoe.reviewCount} approved
             reviews for this release.
           </p>
+          <p className="detail-muted">
+            Weighted consensus: {shoe.reviewSignalSummary.dominantSentiment ?? "unresolved"}.
+          </p>
           <div className="detail-chip-row">
             {shoe.reviewSignalSummary.topHighlights.length ? (
               shoe.reviewSignalSummary.topHighlights.map((highlight) => (
@@ -111,6 +114,11 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
             Sentiment: {shoe.reviewSignalSummary.sentimentBreakdown.positive} positive,{" "}
             {shoe.reviewSignalSummary.sentimentBreakdown.mixed} mixed,{" "}
             {shoe.reviewSignalSummary.sentimentBreakdown.negative} negative.
+          </p>
+          <p className="detail-muted">
+            Weighted signal: {shoe.reviewSignalSummary.weightedSentiment.positive} positive,{" "}
+            {shoe.reviewSignalSummary.weightedSentiment.mixed} mixed,{" "}
+            {shoe.reviewSignalSummary.weightedSentiment.negative} negative.
           </p>
         </article>
 
