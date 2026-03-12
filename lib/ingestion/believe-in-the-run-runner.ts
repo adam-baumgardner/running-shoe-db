@@ -86,6 +86,10 @@ export async function runBelieveInTheRunImport({
       status: "running",
       query,
       startedAt: new Date(),
+      metadata: {
+        importer: believeInTheRunImporter.key,
+        releaseId: selected.releaseId,
+      },
     })
     .returning({ id: crawlRuns.id });
 
@@ -195,6 +199,7 @@ export async function runBelieveInTheRunImport({
         finishedAt: new Date(),
         metadata: {
           importer: believeInTheRunImporter.key,
+          releaseId: selected.releaseId,
           discoveryStrategy: "sitemap",
           averageCandidateConfidence,
           maxCandidateConfidence,
@@ -220,6 +225,7 @@ export async function runBelieveInTheRunImport({
         finishedAt: new Date(),
         metadata: {
           importer: believeInTheRunImporter.key,
+          releaseId: selected.releaseId,
           failureStage,
         },
       })

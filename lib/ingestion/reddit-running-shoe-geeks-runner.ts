@@ -88,6 +88,10 @@ export async function runRedditRunningShoeGeeksImport({
       status: "running",
       query,
       startedAt: new Date(),
+      metadata: {
+        importer: redditRunningShoeGeeksImporter.key,
+        releaseId: selected.releaseId,
+      },
     })
     .returning({ id: crawlRuns.id });
 
@@ -212,6 +216,7 @@ export async function runRedditRunningShoeGeeksImport({
         finishedAt: new Date(),
         metadata: {
           importer: redditRunningShoeGeeksImporter.key,
+          releaseId: selected.releaseId,
           discoveryStrategy: "subreddit-search-json",
           averageCandidateConfidence,
           maxCandidateConfidence,
@@ -237,6 +242,7 @@ export async function runRedditRunningShoeGeeksImport({
         finishedAt: new Date(),
         metadata: {
           importer: redditRunningShoeGeeksImporter.key,
+          releaseId: selected.releaseId,
           failureStage,
         },
       })
