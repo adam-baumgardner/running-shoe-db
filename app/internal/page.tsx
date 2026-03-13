@@ -3,6 +3,7 @@ import {
   createManualReviewAction,
   createReviewSourceAction,
   createShoeModelAction,
+  generateAiReviewSummaryAction,
   runBelieveInTheRunCrawlAction,
   runDoctorsOfRunningCrawlAction,
   runRedditRunningShoeGeeksCrawlAction,
@@ -303,6 +304,34 @@ export default async function InternalPage() {
             </label>
             <button className="button-primary" type="submit">
               Save release
+            </button>
+          </form>
+        </article>
+
+        <article className="detail-panel">
+          <p className="feature-kicker">AI Summary</p>
+          <h2>Generate release review summary</h2>
+          <form action={generateAiReviewSummaryAction} className="editorial-form">
+            <label className="filter-field">
+              <span>Release</span>
+              <select name="releaseId" required defaultValue="">
+                <option value="" disabled>
+                  Select release
+                </option>
+                {data.releases.map((release) => (
+                  <option key={release.id} value={release.id}>
+                    {release.label}
+                    {release.hasAiReviewSummary ? " · summary exists" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="detail-muted">
+              Generates a release-level AI summary from approved reviews only. Re-running replaces
+              the previous generated summary.
+            </p>
+            <button className="button-primary" type="submit">
+              Generate AI summary
             </button>
           </form>
         </article>
@@ -647,6 +676,7 @@ export default async function InternalPage() {
           <div className="editorial-table-head">MSRP</div>
           <div className="editorial-table-head">Weight</div>
           <div className="editorial-table-head">Drop</div>
+          <div className="editorial-table-head">AI Summary</div>
 
           {data.recentReleases.map((release) => (
             <div className="editorial-row" key={release.id}>
@@ -657,6 +687,12 @@ export default async function InternalPage() {
               <div>{release.msrpUsd ? `$${release.msrpUsd}` : "Pending"}</div>
               <div>{release.weightOzMen ? `${release.weightOzMen} oz` : "Pending"}</div>
               <div>{release.dropMm ? `${release.dropMm} mm` : "Pending"}</div>
+              <div>
+                <span className="pill">{release.hasAiReviewSummary ? "generated" : "missing"}</span>
+                <p className="detail-muted">
+                  {formatDateTime(release.aiSummaryGeneratedAt) ?? "No summary yet"}
+                </p>
+              </div>
             </div>
           ))}
         </div>

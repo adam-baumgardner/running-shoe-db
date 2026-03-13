@@ -8,6 +8,8 @@ import { runDoctorsOfRunningImport } from "@/lib/ingestion/doctors-of-running-ru
 import { runRedditRunningShoeGeeksImport } from "@/lib/ingestion/reddit-running-shoe-geeks-runner";
 import { runRunRepeatImport } from "@/lib/ingestion/runrepeat-runner";
 import { runScheduledIngestion } from "@/lib/ingestion/scheduler";
+import { generateReleaseReviewSummary } from "@/lib/ai/review-summary";
+import { mergeReleaseMetadata } from "@/lib/server/release-metadata";
 import {
   brands,
   crawlSources,
@@ -133,6 +135,10 @@ export async function upsertReleaseAction(formData: FormData) {
     throw new Error("Shoe and version name are required.");
   }
 
+  const existingRelease = await db.query.shoeReleases.findFirst({
+    where: and(eq(shoeReleases.shoeId, shoeId), eq(shoeReleases.versionName, versionName)),
+  });
+
   const pinnedTakeaways = pinnedTakeawaysRaw
     .split("\n")
     .map((value) => value.trim())
@@ -143,13 +149,13 @@ export async function upsertReleaseAction(formData: FormData) {
     .map((value) => value.trim())
     .filter(Boolean)
     .slice(0, 8);
-  const metadata = {
+  const metadata = mergeReleaseMetadata(existingRelease?.metadata, {
     editorialReviewSummary: {
       summaryNote: editorialSummaryNote || null,
       pinnedTakeaways,
       ignoredThemes,
     },
-  };
+  });
 
   const inserted = await db
     .insert(shoeReleases)
@@ -462,6 +468,79 @@ export async function runDoctorsOfRunningCrawlAction(formData: FormData) {
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
+}
+
+export async function generateAiReviewSummaryAction(formData: FormData) {
+  const db = requireDatabase();
+  const releaseId = String(formData.get("releaseId") ?? "").trim();
+
+  if (!releaseId) {
+    throw new Error("Release is required.");
+  }
+
+  const release = await db
+    .select({
+      id: shoeReleases.id,
+      versionName: shoeReleases.versionName,
+      category: shoes.category,
+      terrain: shoes.terrain,
+      stability: shoes.stability,
+      metadata: shoeReleases.metadata,
+      shoeName: shoes.name,
+      brandName: brands.name,
+      shoeSlug: shoes.slug,
+    })
+    .from(shoeReleases)
+    .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+    .innerJoin(brands, eq(shoes.brandId, brands.id))
+    .where(eq(shoeReleases.id, releaseId))
+    .limit(1);
+
+  const row = release[0];
+  if (!row) {
+    throw new Error("Release not found.");
+  }
+
+  const approvedReviews = await db
+    .select({
+      title: reviews.title,
+      excerpt: reviews.excerpt,
+      body: reviews.body,
+      scoreNormalized100: reviews.scoreNormalized100,
+      sentiment: reviews.sentiment,
+      publishedAt: reviews.publishedAt,
+      sourceName: reviewSources.name,
+      sourceType: reviewSources.sourceType,
+      authorName: reviewAuthors.displayName,
+    })
+    .from(reviews)
+    .innerJoin(reviewSources, eq(reviews.sourceId, reviewSources.id))
+    .leftJoin(reviewAuthors, eq(reviews.authorId, reviewAuthors.id))
+    .where(and(eq(reviews.releaseId, releaseId), eq(reviews.status, "approved")));
+
+  const summary = await generateReleaseReviewSummary({
+    releaseLabel: `${row.brandName} ${row.versionName}`,
+    category: row.category,
+    terrain: row.terrain,
+    stability: row.stability,
+    reviews: approvedReviews.map((review) => ({
+      ...review,
+      publishedAt: review.publishedAt ? review.publishedAt.toISOString().slice(0, 10) : null,
+    })),
+  });
+
+  await db
+    .update(shoeReleases)
+    .set({
+      metadata: mergeReleaseMetadata(row.metadata, {
+        aiReviewSummary: summary,
+      }),
+    })
+    .where(eq(shoeReleases.id, releaseId));
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+  revalidatePath(`/shoes/${row.shoeSlug}`);
 }
 
 function slugify(value: string) {

@@ -22,6 +22,7 @@ export interface EditorialSourceOption {
 export interface EditorialReleaseOption {
   id: string;
   label: string;
+  hasAiReviewSummary?: boolean;
 }
 
 export interface EditorialReviewRow {
@@ -59,6 +60,8 @@ export interface EditorialDashboardData {
     msrpUsd: number | null;
     weightOzMen: number | null;
     dropMm: number | null;
+    hasAiReviewSummary: boolean;
+    aiSummaryGeneratedAt: string | null;
   }>;
   releaseCoverage: Array<{
     releaseId: string;
@@ -160,6 +163,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
           id: shoeReleases.id,
           shoeName: shoes.name,
           versionName: shoeReleases.versionName,
+          metadata: shoeReleases.metadata,
         })
         .from(shoeReleases)
         .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
@@ -217,6 +221,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
           msrpUsd: shoeReleases.msrpUsd,
           weightOzMen: shoeSpecs.weightOzMen,
           dropMm: shoeSpecs.dropMm,
+          metadata: shoeReleases.metadata,
         })
         .from(shoeReleases)
         .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
@@ -388,6 +393,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
     releases: releaseRows.map((release) => ({
       id: release.id,
       label: `${release.shoeName} ${release.versionName}`,
+      hasAiReviewSummary: hasAiReviewSummary(release.metadata),
     })),
     sources: sourceRows,
     recentReviews: reviewRows.map((review) => ({
@@ -411,6 +417,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       msrpUsd: release.msrpUsd ? Number(release.msrpUsd) : null,
       weightOzMen: release.weightOzMen ? Number(release.weightOzMen) : null,
       dropMm: release.dropMm,
+      hasAiReviewSummary: hasAiReviewSummary(release.metadata),
+      aiSummaryGeneratedAt: getAiReviewSummaryGeneratedAt(release.metadata),
     })),
     releaseCoverage: [...coverageMap.entries()]
       .map(([releaseId, entry]) => ({
@@ -655,4 +663,27 @@ function getEditorialOverrideHistory(metadata: unknown) {
         duplicateOfReviewId: string | null;
       } => Boolean(entry),
     );
+}
+
+function hasAiReviewSummary(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") {
+    return false;
+  }
+
+  const aiReviewSummary = (metadata as Record<string, unknown>).aiReviewSummary;
+  return Boolean(aiReviewSummary && typeof aiReviewSummary === "object");
+}
+
+function getAiReviewSummaryGeneratedAt(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") {
+    return null;
+  }
+
+  const aiReviewSummary = (metadata as Record<string, unknown>).aiReviewSummary;
+  if (!aiReviewSummary || typeof aiReviewSummary !== "object") {
+    return null;
+  }
+
+  const generatedAt = (aiReviewSummary as Record<string, unknown>).generatedAt;
+  return typeof generatedAt === "string" ? generatedAt : null;
 }

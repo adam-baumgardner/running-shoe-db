@@ -2,6 +2,7 @@ import { and, avg, count, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { shoes as fallbackShoes } from "@/lib/data";
 import { HIGHLIGHT_PATTERNS, normalizeSearchText } from "@/lib/ingestion/review-normalization";
+import { getReleaseAiReviewSummary, getReleaseReconciliationOverrides } from "@/lib/server/release-metadata";
 import {
   brands,
   reviewAuthors,
@@ -118,6 +119,20 @@ export interface ShoeDetail {
       }>;
     }>;
   };
+  aiReviewSummary: {
+    overview: string;
+    overallSentiment: "positive" | "mixed" | "negative";
+    confidence: "low" | "medium" | "high";
+    pros: string[];
+    cons: string[];
+    bestFor: string[];
+    watchOuts: string[];
+    reviewCount: number;
+    sourceCount: number;
+    generatedAt: string;
+    model: string | null;
+    provider: "openai" | "heuristic";
+  } | null;
   reviews: ShoeReviewSummary[];
 }
 
@@ -350,6 +365,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
       reviewSignalSummary: aggregateReviewSignals(mappedReviews),
       reviewReconciliation: reconcileReviewEvidence(mappedReviews, row.metadata),
+      aiReviewSummary: getReleaseAiReviewSummary(row.metadata),
       reviews: mappedReviews,
     };
   } catch {
@@ -533,36 +549,6 @@ function buildThemeTakeaways(
 
     return `${theme.label} ${sentimentVerb} with ${theme.confidence} confidence.`;
   });
-}
-
-function getReleaseReconciliationOverrides(metadata: unknown) {
-  if (!metadata || typeof metadata !== "object") {
-    return {
-      summaryNote: null,
-      pinnedTakeaways: [] as string[],
-      ignoredThemes: [] as string[],
-    };
-  }
-
-  const summary = (metadata as Record<string, unknown>).editorialReviewSummary;
-  if (!summary || typeof summary !== "object") {
-    return {
-      summaryNote: null,
-      pinnedTakeaways: [] as string[],
-      ignoredThemes: [] as string[],
-    };
-  }
-
-  const record = summary as Record<string, unknown>;
-  return {
-    summaryNote: typeof record.summaryNote === "string" ? record.summaryNote : null,
-    pinnedTakeaways: Array.isArray(record.pinnedTakeaways)
-      ? record.pinnedTakeaways.filter((item): item is string => typeof item === "string").slice(0, 5)
-      : [],
-    ignoredThemes: Array.isArray(record.ignoredThemes)
-      ? record.ignoredThemes.filter((item): item is string => typeof item === "string").slice(0, 8)
-      : [],
-  };
 }
 
 function aggregateReviewSignals(reviews: ShoeReviewSummary[]) {
@@ -858,6 +844,7 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
         },
       ],
     },
+    aiReviewSummary: null,
     reviews: [
       {
         id: `${match.id}-review`,

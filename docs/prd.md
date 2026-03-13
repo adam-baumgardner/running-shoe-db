@@ -365,3 +365,18 @@ These are current decisions unless explicitly changed:
 ## 19. Change log
 
 - March 12, 2026: created initial PRD based on the active rebuild and current implementation.
+## AI Review Summaries
+
+The product should generate a release-level AI summary from all approved scraped reviews and commentary for a shoe model. This summary should synthesize:
+
+- overall sentiment
+- recurring pros
+- recurring cons
+- who the shoe seems best for
+- key watch-outs or fit caveats
+
+The generated summary is editorially downstream of moderation:
+
+- only approved reviews are included
+- editors can still pin manual takeaways and notes above the automated summary
+- the generated summary can be regenerated as new approved reviews arrive

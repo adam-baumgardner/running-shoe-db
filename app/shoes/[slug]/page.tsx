@@ -90,6 +90,49 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
         </article>
 
         <article className="detail-panel">
+          <p className="feature-kicker">AI Summary</p>
+          <h2>Aggregated review read</h2>
+          {shoe.aiReviewSummary ? (
+            <>
+              <p>{shoe.aiReviewSummary.overview}</p>
+              <div className="detail-chip-row">
+                <span className="pill">{shoe.aiReviewSummary.overallSentiment}</span>
+                <span className="pill">{shoe.aiReviewSummary.confidence} confidence</span>
+                <span className="pill">
+                  {shoe.aiReviewSummary.sourceCount} sources / {shoe.aiReviewSummary.reviewCount} reviews
+                </span>
+                <span className="pill">{shoe.aiReviewSummary.provider}</span>
+              </div>
+              <dl className="spec-grid">
+                <div>
+                  <dt>Pros</dt>
+                  <dd>{shoe.aiReviewSummary.pros.join(" ") || "Pending"}</dd>
+                </div>
+                <div>
+                  <dt>Cons</dt>
+                  <dd>{shoe.aiReviewSummary.cons.join(" ") || "Pending"}</dd>
+                </div>
+                <div>
+                  <dt>Best for</dt>
+                  <dd>{shoe.aiReviewSummary.bestFor.join(" ") || "Pending"}</dd>
+                </div>
+                <div>
+                  <dt>Watch-outs</dt>
+                  <dd>{shoe.aiReviewSummary.watchOuts.join(" ") || "Pending"}</dd>
+                </div>
+              </dl>
+              <p className="detail-muted">
+                Generated {shoe.aiReviewSummary.generatedAt.slice(0, 10)}
+                {shoe.aiReviewSummary.model ? ` with ${shoe.aiReviewSummary.model}` : ""}
+                .
+              </p>
+            </>
+          ) : (
+            <p className="detail-muted">No AI summary has been generated for this release yet.</p>
+          )}
+        </article>
+
+        <article className="detail-panel">
           <p className="feature-kicker">Consensus</p>
           <h2>Cross-source review summary</h2>
           <p>

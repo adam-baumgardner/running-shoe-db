@@ -38,3 +38,11 @@ The first automated crawl loop is now exposed at `/api/cron/ingest`.
 - Vercel cron is configured in [vercel.json](/Users/adambaumgardner/Documents/Documents/Django/running-shoe-db/vercel.json)
 - `CRON_SECRET` can be used for authenticated manual calls
 - crawl source cadence and active state are managed from `/internal`
+
+## AI review summaries
+
+Release-level AI summaries are generated from approved reviews only.
+
+- `OPENAI_API_KEY` enables model-backed generation
+- `OPENAI_MODEL` optionally overrides the default model
+- if no API key is configured, the app falls back to a heuristic summary so the workflow still functions in development
