@@ -79,6 +79,13 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
             {comparison.narrative.caution ? (
               <p className="detail-muted">{comparison.narrative.caution}</p>
             ) : null}
+            <div className="detail-chip-row">
+              {selectedRows.map((shoe) => (
+                <span className="pill" key={`${shoe.id}-coverage`}>
+                  {shoe.brand} {shoe.release}: {shoe.reviewCoverage.status}
+                </span>
+              ))}
+            </div>
             <div className="review-list">
               {comparison.narrative.keyDifferences.map((difference) => (
                 <article className="review-card" key={difference.title}>
@@ -107,6 +114,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
             {shoe.aiReviewSummary ? (
               <p className="detail-muted">{shoe.aiReviewSummary.overview}</p>
             ) : null}
+            <p className="detail-muted">{shoe.reviewCoverage.summary}</p>
             <dl className="spec-grid">
               <div>
                 <dt>Usage</dt>
@@ -152,6 +160,9 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
                 ))}
               </div>
             ) : null}
+            <p className="detail-muted">
+              Freshest review: {shoe.reviewCoverage.freshestReviewDate ?? "Unknown"}
+            </p>
             <div className="card-actions">
               <Link className="text-link" href={`/shoes/${shoe.slug}`}>
                 Open shoe detail

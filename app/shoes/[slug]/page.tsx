@@ -28,6 +28,7 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
             <span className="pill">{shoe.stability}</span>
             <span className="pill">{shoe.isPlated ? "Plated" : "Non-plated"}</span>
             <span className="pill">{shoe.reviewCount} reviews indexed</span>
+            <span className="pill">{shoe.reviewCoverage.status} coverage</span>
           </div>
         </div>
         <aside className="hero-card">
@@ -59,6 +60,19 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
       </section>
 
       <section className="detail-grid">
+        <article className="detail-panel">
+          <p className="feature-kicker">Coverage</p>
+          <h2>How reliable is the current review set?</h2>
+          <p>{shoe.reviewCoverage.summary}</p>
+          <div className="detail-chip-row">
+            <span className="pill">{shoe.reviewCoverage.sourceCount} sources</span>
+            <span className="pill">{shoe.reviewCoverage.reviewCount} reviews</span>
+            <span className="pill">
+              Freshest review: {shoe.reviewCoverage.freshestReviewDate ?? "Unknown"}
+            </span>
+          </div>
+        </article>
+
         <article className="detail-panel">
           <p className="feature-kicker">Specifications</p>
           <dl className="spec-grid">

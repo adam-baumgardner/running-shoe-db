@@ -86,6 +86,13 @@ export interface ShoeDetail {
   sourceNotes: string | null;
   reviewCount: number;
   averageReviewScore: number | null;
+  reviewCoverage: {
+    status: "strong" | "developing" | "thin" | "stale";
+    summary: string;
+    sourceCount: number;
+    reviewCount: number;
+    freshestReviewDate: string | null;
+  };
   reviewSignalSummary: {
     topHighlights: Array<{ label: string; count: number; weight: number }>;
     sentimentBreakdown: {
@@ -148,6 +155,7 @@ export interface ComparisonRow extends CatalogCard {
   heelStackMm: number | null;
   forefootStackMm: number | null;
   averageReviewScore: number | null;
+  reviewCoverage: ShoeDetail["reviewCoverage"];
   aiReviewSummary: ShoeDetail["aiReviewSummary"];
   reviewReconciliation: ShoeDetail["reviewReconciliation"];
 }
@@ -389,6 +397,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       sourceNotes: row.sourceNotes,
       reviewCount: Number(row.reviewCount),
       averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
+      reviewCoverage: assessReviewCoverage(mappedReviews),
       reviewSignalSummary: aggregateReviewSignals(mappedReviews),
       reviewReconciliation: reconcileReviewEvidence(mappedReviews, row.metadata),
       aiReviewSummary: getReleaseAiReviewSummary(row.metadata),
@@ -636,6 +645,58 @@ function aggregateReviewSignals(reviews: ShoeReviewSummary[]) {
   };
 }
 
+function assessReviewCoverage(reviews: ShoeReviewSummary[]) {
+  const sourceCount = new Set(reviews.map((review) => `${review.sourceType}:${review.sourceName}`)).size;
+  const datedReviews = reviews
+    .map((review) => review.publishedAt)
+    .filter((value): value is string => Boolean(value))
+    .map((value) => new Date(value))
+    .filter((value) => !Number.isNaN(value.getTime()))
+    .sort((left, right) => right.getTime() - left.getTime());
+  const freshestReviewDate = datedReviews[0] ? datedReviews[0].toISOString().slice(0, 10) : null;
+  const daysSinceFreshest = datedReviews[0]
+    ? Math.floor((Date.now() - datedReviews[0].getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+
+  if (reviews.length === 0) {
+    return {
+      status: "thin" as const,
+      summary: "No approved review coverage yet for this release.",
+      sourceCount,
+      reviewCount: reviews.length,
+      freshestReviewDate,
+    };
+  }
+
+  if (daysSinceFreshest !== null && daysSinceFreshest > 365) {
+    return {
+      status: "stale" as const,
+      summary: "Current review coverage is present, but the freshest source is more than a year old.",
+      sourceCount,
+      reviewCount: reviews.length,
+      freshestReviewDate,
+    };
+  }
+
+  if (reviews.length < 2 || sourceCount < 2) {
+    return {
+      status: "developing" as const,
+      summary: "Review coverage is still developing, so sentiment and AI summaries should be treated as early signal.",
+      sourceCount,
+      reviewCount: reviews.length,
+      freshestReviewDate,
+    };
+  }
+
+  return {
+    status: "strong" as const,
+    summary: "Review coverage is broad enough to support stronger comparison and summary claims.",
+    sourceCount,
+    reviewCount: reviews.length,
+    freshestReviewDate,
+  };
+}
+
 function getReviewWeight(review: ShoeReviewSummary) {
   const sourceWeight = review.sourceType === "editorial" ? 1 : review.sourceType === "reddit" ? 0.7 : 0.55;
   const freshnessWeight = getFreshnessWeight(review.publishedAt);
@@ -774,6 +835,7 @@ export async function getComparisonRows(selectedSlugs: string[]): Promise<Compar
       isPlated: row.isPlated,
       priceUsd: row.priceUsd ? Number(row.priceUsd) : null,
       averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
+      reviewCoverage: assessComparisonRowCoverage(row.metadata, Number(row.reviewCount)),
       aiReviewSummary: getReleaseAiReviewSummary(row.metadata),
       reviewReconciliation: buildComparisonReconciliationFromMetadata(row.metadata),
     }));
@@ -842,6 +904,13 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
     sourceNotes: "Fallback data from the design seed set.",
     reviewCount: match.reviewCount,
     averageReviewScore: 82,
+    reviewCoverage: {
+      status: "developing",
+      summary: "Fallback review coverage signal only.",
+      sourceCount: 1,
+      reviewCount: match.reviewCount,
+      freshestReviewDate: "2024-01-01",
+    },
     reviewSignalSummary: {
       topHighlights: [
         { label: "Cushioning", count: 1, weight: 1 },
@@ -909,6 +978,13 @@ function buildFallbackComparison(shoes: CatalogCard[]): ComparisonRow[] {
     heelStackMm: shoe.dropMm ? shoe.dropMm + 28 : null,
     forefootStackMm: 28,
     averageReviewScore: 80 + index * 5,
+    reviewCoverage: {
+      status: "developing",
+      summary: "Fallback review coverage signal only.",
+      sourceCount: 1,
+      reviewCount: shoe.reviewCount,
+      freshestReviewDate: "2024-01-01",
+    },
     aiReviewSummary: null,
     reviewReconciliation: {
       summaryNote: null,
@@ -926,6 +1002,40 @@ function buildComparisonReconciliationFromMetadata(metadata: unknown): ShoeDetai
     topTakeaways: overrides.pinnedTakeaways,
     contradictionCount: 0,
     themes: [],
+  };
+}
+
+function assessComparisonRowCoverage(metadata: unknown, reviewCount: number): ShoeDetail["reviewCoverage"] {
+  const aiReviewSummary = getReleaseAiReviewSummary(metadata);
+  const sourceCount = aiReviewSummary?.sourceCount ?? 0;
+  const freshestReviewDate = aiReviewSummary?.generatedAt ? aiReviewSummary.generatedAt.slice(0, 10) : null;
+
+  if (reviewCount === 0) {
+    return {
+      status: "thin",
+      summary: "No approved review coverage yet for this release.",
+      sourceCount,
+      reviewCount,
+      freshestReviewDate: null,
+    };
+  }
+
+  if (sourceCount < 2 || reviewCount < 2) {
+    return {
+      status: "developing",
+      summary: "Review coverage is still developing for this release.",
+      sourceCount,
+      reviewCount,
+      freshestReviewDate,
+    };
+  }
+
+  return {
+    status: "strong",
+    summary: "This release has enough review coverage to support comparison guidance.",
+    sourceCount,
+    reviewCount,
+    freshestReviewDate,
   };
 }
 
