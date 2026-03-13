@@ -3,6 +3,7 @@ import { getDb } from "@/db";
 import { brands, crawlRuns, crawlSources, reviewSources, reviews, shoeReleases, shoes, shoeSpecs } from "@/db/schema";
 import { assessCrawlDueState } from "@/lib/ingestion/scheduler";
 import {
+  getAiReviewSummaryHistory,
   getAiReviewSummaryDisplayStatus,
   getAiReviewSummaryEvidenceCount,
   getAiReviewSummaryGeneratedAt,
@@ -140,6 +141,18 @@ export interface EditorialDashboardData {
     sentiment: string | null;
     highlights: string[];
     duplicateOfReviewId: string | null;
+  }>;
+  recentAiSummaryHistory: Array<{
+    releaseLabel: string;
+    timestamp: string;
+    eventType: "generated" | "refreshed" | "cleared" | "override-enabled" | "override-disabled";
+    provider: "openai" | "heuristic" | "editorial" | null;
+    overview: string | null;
+    overallSentiment: string | null;
+    confidence: string | null;
+    reviewCount: number;
+    sourceCount: number;
+    evidenceCount: number;
   }>;
 }
 
@@ -347,6 +360,20 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       duplicateOfReviewId: event.duplicateOfReviewId,
     })),
   );
+  const recentAiSummaryHistory = releaseRows.flatMap((release) =>
+    getAiReviewSummaryHistory(release.metadata).map((entry) => ({
+      releaseLabel: `${release.shoeName} ${release.versionName}`,
+      timestamp: entry.timestamp,
+      eventType: entry.eventType,
+      provider: entry.provider,
+      overview: entry.overview,
+      overallSentiment: entry.overallSentiment,
+      confidence: entry.confidence,
+      reviewCount: entry.reviewCount,
+      sourceCount: entry.sourceCount,
+      evidenceCount: entry.evidenceCount,
+    })),
+  );
 
   const coverageMap = new Map<
     string,
@@ -519,6 +546,9 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
     recentOverrideEvents: recentOverrideEvents
       .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
       .slice(0, 12),
+    recentAiSummaryHistory: recentAiSummaryHistory
+      .sort((left, right) => right.timestamp.localeCompare(left.timestamp))
+      .slice(0, 12),
   };
 }
 
@@ -541,6 +571,7 @@ function getFallbackEditorialDashboardData(): EditorialDashboardData {
     crawlSources: [],
     recentCrawlRuns: [],
     recentOverrideEvents: [],
+    recentAiSummaryHistory: [],
   };
 }
 

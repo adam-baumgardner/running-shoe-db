@@ -41,6 +41,18 @@ export interface ReleaseAiReviewSummaryOverride {
   updatedAt: string | null;
 }
 
+export interface ReleaseAiReviewSummaryHistoryEntry {
+  timestamp: string;
+  eventType: "generated" | "refreshed" | "cleared" | "override-enabled" | "override-disabled";
+  provider: "openai" | "heuristic" | "editorial" | null;
+  overview: string | null;
+  overallSentiment: ReviewSentiment | null;
+  confidence: ReviewConfidence | null;
+  reviewCount: number;
+  sourceCount: number;
+  evidenceCount: number;
+}
+
 type ReleaseMetadataRecord = Record<string, unknown>;
 
 export function mergeReleaseMetadata(
@@ -272,6 +284,68 @@ export function getAiReviewSummaryOverrideFields(metadata: unknown) {
     bestFor: string;
     watchOuts: string;
   };
+}
+
+export function appendAiReviewSummaryHistory(
+  metadata: unknown,
+  entry: ReleaseAiReviewSummaryHistoryEntry,
+) {
+  const base = asRecord(metadata);
+  const history = getAiReviewSummaryHistory(base);
+
+  return {
+    ...base,
+    aiReviewSummaryHistory: [entry, ...history].slice(0, 20),
+  };
+}
+
+export function getAiReviewSummaryHistory(metadata: unknown): ReleaseAiReviewSummaryHistoryEntry[] {
+  const value = asRecord(metadata).aiReviewSummaryHistory;
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        return null;
+      }
+
+      const record = entry as Record<string, unknown>;
+      const timestamp = typeof record.timestamp === "string" ? record.timestamp : null;
+      const eventType =
+        record.eventType === "generated" ||
+        record.eventType === "refreshed" ||
+        record.eventType === "cleared" ||
+        record.eventType === "override-enabled" ||
+        record.eventType === "override-disabled"
+          ? record.eventType
+          : null;
+      const provider =
+        record.provider === "openai" ||
+        record.provider === "heuristic" ||
+        record.provider === "editorial"
+          ? record.provider
+          : null;
+
+      if (!timestamp || !eventType) {
+        return null;
+      }
+
+      return {
+        timestamp,
+        eventType,
+        provider,
+        overview: typeof record.overview === "string" ? record.overview : null,
+        overallSentiment: readSentiment(record.overallSentiment),
+        confidence: readConfidence(record.confidence),
+        reviewCount: typeof record.reviewCount === "number" ? record.reviewCount : 0,
+        sourceCount: typeof record.sourceCount === "number" ? record.sourceCount : 0,
+        evidenceCount: typeof record.evidenceCount === "number" ? record.evidenceCount : 0,
+      };
+    })
+    .filter((entry): entry is ReleaseAiReviewSummaryHistoryEntry => Boolean(entry))
+    .slice(0, 20);
 }
 
 function asRecord(value: unknown) {

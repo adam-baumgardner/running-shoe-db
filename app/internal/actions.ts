@@ -9,7 +9,7 @@ import { runRedditRunningShoeGeeksImport } from "@/lib/ingestion/reddit-running-
 import { runRunRepeatImport } from "@/lib/ingestion/runrepeat-runner";
 import { runScheduledIngestion } from "@/lib/ingestion/scheduler";
 import { generateReleaseReviewSummary } from "@/lib/ai/review-summary";
-import { mergeReleaseMetadata } from "@/lib/server/release-metadata";
+import { appendAiReviewSummaryHistory, mergeReleaseMetadata } from "@/lib/server/release-metadata";
 import {
   brands,
   crawlSources,
@@ -582,9 +582,32 @@ export async function updateAiReviewSummaryOverrideAction(formData: FormData) {
   await db
     .update(shoeReleases)
     .set({
-      metadata: mergeReleaseMetadata(row.metadata, {
-        editorialAiReviewSummaryOverride: {
-          isEnabled,
+      metadata: appendAiReviewSummaryHistory(
+        mergeReleaseMetadata(row.metadata, {
+          editorialAiReviewSummaryOverride: {
+            isEnabled,
+            overview: overview || null,
+            overallSentiment:
+              overallSentimentRaw === "positive" ||
+              overallSentimentRaw === "mixed" ||
+              overallSentimentRaw === "negative"
+                ? overallSentimentRaw
+                : null,
+            confidence:
+              confidenceRaw === "low" || confidenceRaw === "medium" || confidenceRaw === "high"
+                ? confidenceRaw
+                : null,
+            pros: parseLineList(prosRaw, 4),
+            cons: parseLineList(consRaw, 4),
+            bestFor: parseLineList(bestForRaw, 4),
+            watchOuts: parseLineList(watchOutsRaw, 4),
+            updatedAt: new Date().toISOString(),
+          },
+        }),
+        {
+          timestamp: new Date().toISOString(),
+          eventType: isEnabled ? "override-enabled" : "override-disabled",
+          provider: "editorial",
           overview: overview || null,
           overallSentiment:
             overallSentimentRaw === "positive" ||
@@ -596,13 +619,11 @@ export async function updateAiReviewSummaryOverrideAction(formData: FormData) {
             confidenceRaw === "low" || confidenceRaw === "medium" || confidenceRaw === "high"
               ? confidenceRaw
               : null,
-          pros: parseLineList(prosRaw, 4),
-          cons: parseLineList(consRaw, 4),
-          bestFor: parseLineList(bestForRaw, 4),
-          watchOuts: parseLineList(watchOutsRaw, 4),
-          updatedAt: new Date().toISOString(),
+          reviewCount: 0,
+          sourceCount: 0,
+          evidenceCount: 0,
         },
-      }),
+      ),
     })
     .where(eq(shoeReleases.id, releaseId));
 
@@ -660,12 +681,27 @@ async function regenerateAiReviewSummaryForRelease(
     .where(and(eq(reviews.releaseId, releaseId), eq(reviews.status, "approved")));
 
   if (!approvedReviews.length) {
+    const nextMetadata = appendAiReviewSummaryHistory(
+      mergeReleaseMetadata(row.metadata, {
+        aiReviewSummary: null,
+      }),
+      {
+        timestamp: new Date().toISOString(),
+        eventType: "cleared",
+        provider: null,
+        overview: null,
+        overallSentiment: null,
+        confidence: null,
+        reviewCount: 0,
+        sourceCount: 0,
+        evidenceCount: 0,
+      },
+    );
+
     await db
       .update(shoeReleases)
       .set({
-        metadata: mergeReleaseMetadata(row.metadata, {
-          aiReviewSummary: null,
-        }),
+        metadata: nextMetadata,
       })
       .where(eq(shoeReleases.id, releaseId));
 
@@ -686,12 +722,31 @@ async function regenerateAiReviewSummaryForRelease(
     })),
   });
 
+  const hadSummary =
+    row.metadata && typeof row.metadata === "object"
+      ? Boolean((row.metadata as Record<string, unknown>).aiReviewSummary)
+      : false;
+  const nextMetadata = appendAiReviewSummaryHistory(
+    mergeReleaseMetadata(row.metadata, {
+      aiReviewSummary: summary,
+    }),
+    {
+      timestamp: new Date().toISOString(),
+      eventType: hadSummary ? "refreshed" : "generated",
+      provider: summary.provider,
+      overview: summary.overview,
+      overallSentiment: summary.overallSentiment,
+      confidence: summary.confidence,
+      reviewCount: summary.reviewCount,
+      sourceCount: summary.sourceCount,
+      evidenceCount: summary.evidence.length,
+    },
+  );
+
   await db
     .update(shoeReleases)
     .set({
-      metadata: mergeReleaseMetadata(row.metadata, {
-        aiReviewSummary: summary,
-      }),
+      metadata: nextMetadata,
     })
     .where(eq(shoeReleases.id, releaseId));
 

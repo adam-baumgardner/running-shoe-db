@@ -640,6 +640,50 @@ export default async function InternalPage() {
       </section>
 
       <section className="detail-panel editorial-table-panel">
+        <p className="feature-kicker">AI History</p>
+        <h2>Recent AI summary events</h2>
+        <div className="editorial-table editorial-table--runs">
+          <div className="editorial-table-head">Release</div>
+          <div className="editorial-table-head">When</div>
+          <div className="editorial-table-head">Event</div>
+          <div className="editorial-table-head">Signal</div>
+          <div className="editorial-table-head">Evidence</div>
+
+          {data.recentAiSummaryHistory.length ? (
+            data.recentAiSummaryHistory.map((event) => (
+              <div className="editorial-row" key={`${event.releaseLabel}-${event.timestamp}-${event.eventType}`}>
+                <div>
+                  <strong>{event.releaseLabel}</strong>
+                  {event.overview ? <p className="detail-muted">{event.overview}</p> : null}
+                </div>
+                <div>{formatDateTime(event.timestamp)}</div>
+                <div>
+                  <span className="pill">{event.eventType}</span>
+                  <p className="detail-muted">{event.provider ?? "n/a"}</p>
+                </div>
+                <div>
+                  <p className="detail-muted">{event.overallSentiment ?? "Unset"}</p>
+                  <p className="detail-muted">{event.confidence ?? "Unset"}</p>
+                  <p className="detail-muted">
+                    {event.sourceCount} sources / {event.reviewCount} reviews
+                  </p>
+                </div>
+                <div>{event.evidenceCount}</div>
+              </div>
+            ))
+          ) : (
+            <div className="editorial-row">
+              <div>No AI summary history yet.</div>
+              <div>n/a</div>
+              <div>n/a</div>
+              <div>n/a</div>
+              <div>n/a</div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="detail-panel editorial-table-panel">
         <p className="feature-kicker">Override History</p>
         <h2>Recent editorial corrections</h2>
         <div className="editorial-table editorial-table--runs">
