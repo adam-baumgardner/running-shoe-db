@@ -76,6 +76,9 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
                 Shared signals: {comparison.narrative.sharedSignals.join(" ")}
               </p>
             ) : null}
+            {comparison.narrative.caution ? (
+              <p className="detail-muted">{comparison.narrative.caution}</p>
+            ) : null}
             <div className="review-list">
               {comparison.narrative.keyDifferences.map((difference) => (
                 <article className="review-card" key={difference.title}>

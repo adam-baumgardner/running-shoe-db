@@ -165,6 +165,7 @@ export interface ComparisonPageData {
     chooserGuidance: string[];
     keyDifferences: ComparisonInsight[];
     sharedSignals: string[];
+    caution: string | null;
   };
 }
 
@@ -935,19 +936,25 @@ function buildComparisonNarrative(rows: ComparisonRow[]): ComparisonPageData["na
       chooserGuidance: [],
       keyDifferences: [],
       sharedSignals: [],
+      caution: null,
     };
   }
 
+  const confidenceState = assessComparisonConfidence(rows);
   const overview = buildComparisonOverview(rows);
-  const chooserGuidance = rows.slice(0, 3).map((row) => buildChooserGuidance(row));
-  const keyDifferences = buildComparisonDifferences(rows).slice(0, 4);
-  const sharedSignals = buildSharedSignals(rows).slice(0, 4);
+  const chooserGuidance = rows
+    .filter((row) => hasComparableNarrativeSignal(row))
+    .slice(0, 3)
+    .map((row) => buildChooserGuidance(row));
+  const keyDifferences = buildComparisonDifferences(rows, confidenceState).slice(0, 4);
+  const sharedSignals = confidenceState.allowSharedSignals ? buildSharedSignals(rows).slice(0, 4) : [];
 
   return {
     overview,
     chooserGuidance,
     keyDifferences,
     sharedSignals,
+    caution: confidenceState.caution,
   };
 }
 
@@ -981,7 +988,10 @@ function buildChooserGuidance(row: ComparisonRow) {
   return `Choose ${row.brand} ${row.release} if ${cues[0] ? lowerCaseFirst(cues[0] as string) : `you want a ${row.category.toLowerCase()} option`}`;
 }
 
-function buildComparisonDifferences(rows: ComparisonRow[]): ComparisonInsight[] {
+function buildComparisonDifferences(
+  rows: ComparisonRow[],
+  confidenceState: ReturnType<typeof assessComparisonConfidence>,
+): ComparisonInsight[] {
   const insights: ComparisonInsight[] = [];
 
   const byPrice = rows.filter((row) => row.priceUsd !== null).sort((left, right) => (left.priceUsd ?? 0) - (right.priceUsd ?? 0));
@@ -1015,12 +1025,14 @@ function buildComparisonDifferences(rows: ComparisonRow[]): ComparisonInsight[] 
     });
   }
 
-  const themeLeaders = rows
-    .map((row) => ({
-      row,
-      theme: row.reviewReconciliation.topTakeaways[0] ?? row.aiReviewSummary?.pros[0] ?? null,
-    }))
-    .filter((entry): entry is { row: ComparisonRow; theme: string } => Boolean(entry.theme));
+  const themeLeaders = confidenceState.allowThemeDifferences
+    ? rows
+        .map((row) => ({
+          row,
+          theme: row.reviewReconciliation.topTakeaways[0] ?? row.aiReviewSummary?.pros[0] ?? null,
+        }))
+        .filter((entry): entry is { row: ComparisonRow; theme: string } => Boolean(entry.theme))
+    : [];
   if (themeLeaders.length >= 2) {
     insights.push({
       title: "Review read",
@@ -1060,6 +1072,45 @@ function buildSharedSignals(rows: ComparisonRow[]) {
 
 function lowerCaseFirst(value: string) {
   return value.charAt(0).toLowerCase() + value.slice(1);
+}
+
+function assessComparisonConfidence(rows: ComparisonRow[]) {
+  const rowsWithStrongSignal = rows.filter((row) => hasComparableNarrativeSignal(row));
+  const hasEnoughRows = rowsWithStrongSignal.length >= 2;
+  const totalEvidence = rows.reduce(
+    (sum, row) => sum + (row.aiReviewSummary?.evidence.length ?? 0) + row.reviewReconciliation.themes.length,
+    0,
+  );
+
+  if (!hasEnoughRows) {
+    return {
+      allowThemeDifferences: false,
+      allowSharedSignals: false,
+      caution: "Review evidence is still thin for at least one of these shoes, so comparison guidance is limited to harder spec differences.",
+    };
+  }
+
+  if (totalEvidence < 6) {
+    return {
+      allowThemeDifferences: true,
+      allowSharedSignals: false,
+      caution: "The review-derived comparison signal is still developing, so shared themes are suppressed until more evidence is indexed.",
+    };
+  }
+
+  return {
+    allowThemeDifferences: true,
+    allowSharedSignals: true,
+    caution: null,
+  };
+}
+
+function hasComparableNarrativeSignal(row: ComparisonRow) {
+  const sourceCount = row.aiReviewSummary?.sourceCount ?? 0;
+  const reviewCount = row.aiReviewSummary?.reviewCount ?? 0;
+  const evidenceCount = row.aiReviewSummary?.evidence.length ?? 0;
+
+  return sourceCount >= 2 || reviewCount >= 2 || evidenceCount >= 2;
 }
 
 function filterCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
