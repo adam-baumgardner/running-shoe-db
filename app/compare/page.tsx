@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCatalogCards, getComparisonRows } from "@/lib/server/catalog";
+import { getCatalogCards, getComparisonPageData } from "@/lib/server/catalog";
 
 interface ComparePageProps {
   searchParams: Promise<{ shoe?: string | string[] }>;
@@ -12,10 +12,11 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     : resolvedSearchParams.shoe
       ? [resolvedSearchParams.shoe]
       : [];
-  const [catalog, selectedRows] = await Promise.all([
+  const [catalog, comparison] = await Promise.all([
     getCatalogCards(),
-    getComparisonRows(selectedSlugs),
+    getComparisonPageData(selectedSlugs),
   ]);
+  const selectedRows = comparison.rows;
 
   return (
     <main className="page-shell">
@@ -56,6 +57,43 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       </section>
 
       <section className="compare-grid" aria-label="Comparison results">
+        {comparison.narrative.overview ? (
+          <article className="detail-panel" style={{ gridColumn: "1 / -1" }}>
+            <p className="feature-kicker">AI Compare</p>
+            <h2>How these shoes separate</h2>
+            <p className="catalog-copy">{comparison.narrative.overview}</p>
+            {comparison.narrative.chooserGuidance.length ? (
+              <div className="detail-chip-row">
+                {comparison.narrative.chooserGuidance.map((guidance) => (
+                  <span className="pill" key={guidance}>
+                    {guidance}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+            {comparison.narrative.sharedSignals.length ? (
+              <p className="detail-muted">
+                Shared signals: {comparison.narrative.sharedSignals.join(" ")}
+              </p>
+            ) : null}
+            <div className="review-list">
+              {comparison.narrative.keyDifferences.map((difference) => (
+                <article className="review-card" key={difference.title}>
+                  <div className="catalog-card-topline">
+                    <span className="pill">{difference.title}</span>
+                  </div>
+                  <p className="catalog-copy">{difference.summary}</p>
+                  {difference.evidence.map((line) => (
+                    <p className="detail-muted" key={line}>
+                      {line}
+                    </p>
+                  ))}
+                </article>
+              ))}
+            </div>
+          </article>
+        ) : null}
+
         {selectedRows.map((shoe) => (
           <article key={shoe.id} className="detail-panel">
             <p className="feature-kicker">{shoe.category}</p>
@@ -63,6 +101,9 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
               {shoe.brand} {shoe.release}
             </h2>
             <p className="catalog-copy">{shoe.rideProfile}</p>
+            {shoe.aiReviewSummary ? (
+              <p className="detail-muted">{shoe.aiReviewSummary.overview}</p>
+            ) : null}
             <dl className="spec-grid">
               <div>
                 <dt>Usage</dt>
@@ -99,6 +140,15 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
                 </dd>
               </div>
             </dl>
+            {shoe.reviewReconciliation.topTakeaways.length ? (
+              <div className="detail-chip-row">
+                {shoe.reviewReconciliation.topTakeaways.map((takeaway) => (
+                  <span className="pill" key={takeaway}>
+                    {takeaway}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <div className="card-actions">
               <Link className="text-link" href={`/shoes/${shoe.slug}`}>
                 Open shoe detail

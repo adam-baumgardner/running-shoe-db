@@ -148,6 +148,24 @@ export interface ComparisonRow extends CatalogCard {
   heelStackMm: number | null;
   forefootStackMm: number | null;
   averageReviewScore: number | null;
+  aiReviewSummary: ShoeDetail["aiReviewSummary"];
+  reviewReconciliation: ShoeDetail["reviewReconciliation"];
+}
+
+export interface ComparisonInsight {
+  title: string;
+  summary: string;
+  evidence: string[];
+}
+
+export interface ComparisonPageData {
+  rows: ComparisonRow[];
+  narrative: {
+    overview: string | null;
+    chooserGuidance: string[];
+    keyDifferences: ComparisonInsight[];
+    sharedSignals: string[];
+  };
 }
 
 export async function getCatalogPageData(filters: CatalogFilters = {}): Promise<CatalogPageData> {
@@ -664,6 +682,14 @@ function getDominantSentiment(weightedSentiment: {
   return sorted[0][0];
 }
 
+export async function getComparisonPageData(selectedSlugs: string[]): Promise<ComparisonPageData> {
+  const rows = await getComparisonRows(selectedSlugs);
+  return {
+    rows,
+    narrative: buildComparisonNarrative(rows),
+  };
+}
+
 export async function getComparisonRows(selectedSlugs: string[]): Promise<ComparisonRow[]> {
   const slugs = selectedSlugs.filter(Boolean).slice(0, 4);
   if (!slugs.length) {
@@ -694,6 +720,7 @@ export async function getComparisonRows(selectedSlugs: string[]): Promise<Compar
         heelStackMm: shoeSpecs.heelStackMm,
         forefootStackMm: shoeSpecs.forefootStackMm,
         dropMm: shoeSpecs.dropMm,
+        metadata: shoeReleases.metadata,
         reviewCount: count(reviews.id),
         averageReviewScore: avg(reviews.scoreNormalized100),
       })
@@ -719,6 +746,7 @@ export async function getComparisonRows(selectedSlugs: string[]): Promise<Compar
         shoeReleases.isPlated,
         shoeReleases.foam,
         shoeReleases.msrpUsd,
+        shoeReleases.metadata,
         shoeSpecs.weightOzMen,
         shoeSpecs.heelStackMm,
         shoeSpecs.forefootStackMm,
@@ -745,6 +773,8 @@ export async function getComparisonRows(selectedSlugs: string[]): Promise<Compar
       isPlated: row.isPlated,
       priceUsd: row.priceUsd ? Number(row.priceUsd) : null,
       averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
+      aiReviewSummary: getReleaseAiReviewSummary(row.metadata),
+      reviewReconciliation: buildComparisonReconciliationFromMetadata(row.metadata),
     }));
   } catch {
     return buildFallbackComparison(buildFallbackCatalog().filter((shoe) => slugs.includes(shoe.slug)));
@@ -878,7 +908,158 @@ function buildFallbackComparison(shoes: CatalogCard[]): ComparisonRow[] {
     heelStackMm: shoe.dropMm ? shoe.dropMm + 28 : null,
     forefootStackMm: 28,
     averageReviewScore: 80 + index * 5,
+    aiReviewSummary: null,
+    reviewReconciliation: {
+      summaryNote: null,
+      topTakeaways: [],
+      contradictionCount: 0,
+      themes: [],
+    },
   }));
+}
+
+function buildComparisonReconciliationFromMetadata(metadata: unknown): ShoeDetail["reviewReconciliation"] {
+  const overrides = getReleaseReconciliationOverrides(metadata);
+  return {
+    summaryNote: overrides.summaryNote,
+    topTakeaways: overrides.pinnedTakeaways,
+    contradictionCount: 0,
+    themes: [],
+  };
+}
+
+function buildComparisonNarrative(rows: ComparisonRow[]): ComparisonPageData["narrative"] {
+  if (rows.length < 2) {
+    return {
+      overview: null,
+      chooserGuidance: [],
+      keyDifferences: [],
+      sharedSignals: [],
+    };
+  }
+
+  const overview = buildComparisonOverview(rows);
+  const chooserGuidance = rows.slice(0, 3).map((row) => buildChooserGuidance(row));
+  const keyDifferences = buildComparisonDifferences(rows).slice(0, 4);
+  const sharedSignals = buildSharedSignals(rows).slice(0, 4);
+
+  return {
+    overview,
+    chooserGuidance,
+    keyDifferences,
+    sharedSignals,
+  };
+}
+
+function buildComparisonOverview(rows: ComparisonRow[]) {
+  const names = rows.map((row) => `${row.brand} ${row.release}`);
+  const lightest = [...rows]
+    .filter((row) => row.weightOz !== null)
+    .sort((left, right) => (left.weightOz ?? 99) - (right.weightOz ?? 99))[0];
+  const maxScore = [...rows]
+    .filter((row) => row.averageReviewScore !== null)
+    .sort((left, right) => (right.averageReviewScore ?? 0) - (left.averageReviewScore ?? 0))[0];
+
+  const clauses = [`${names.join(", ")} serve different buying priorities.`];
+  if (lightest) {
+    clauses.push(`${lightest.brand} ${lightest.release} is the lightest option in this set.`);
+  }
+  if (maxScore) {
+    clauses.push(`${maxScore.brand} ${maxScore.release} currently has the strongest review signal.`);
+  }
+
+  return clauses.join(" ");
+}
+
+function buildChooserGuidance(row: ComparisonRow) {
+  const cues = [
+    row.aiReviewSummary?.bestFor[0],
+    row.usageSummary,
+    row.isPlated ? "Better fit for runners prioritizing a plated feel." : "Safer fit for runners avoiding plated ride dynamics.",
+  ].filter(Boolean);
+
+  return `Choose ${row.brand} ${row.release} if ${cues[0] ? lowerCaseFirst(cues[0] as string) : `you want a ${row.category.toLowerCase()} option`}`;
+}
+
+function buildComparisonDifferences(rows: ComparisonRow[]): ComparisonInsight[] {
+  const insights: ComparisonInsight[] = [];
+
+  const byPrice = rows.filter((row) => row.priceUsd !== null).sort((left, right) => (left.priceUsd ?? 0) - (right.priceUsd ?? 0));
+  if (byPrice.length >= 2 && (byPrice.at(-1)?.priceUsd ?? 0) - (byPrice[0]?.priceUsd ?? 0) >= 20) {
+    insights.push({
+      title: "Price spread",
+      summary: `${byPrice[0]?.brand} ${byPrice[0]?.release} is the cheaper option, while ${byPrice.at(-1)?.brand} ${byPrice.at(-1)?.release} sits at the top of the price range.`,
+      evidence: byPrice.map((row) => `${row.brand} ${row.release}: ${row.priceUsd ? `$${row.priceUsd}` : "Pending"}`),
+    });
+  }
+
+  const byWeight = rows.filter((row) => row.weightOz !== null).sort((left, right) => (left.weightOz ?? 0) - (right.weightOz ?? 0));
+  if (byWeight.length >= 2 && (byWeight.at(-1)?.weightOz ?? 0) - (byWeight[0]?.weightOz ?? 0) >= 0.5) {
+    insights.push({
+      title: "Weight",
+      summary: `${byWeight[0]?.brand} ${byWeight[0]?.release} is meaningfully lighter than ${byWeight.at(-1)?.brand} ${byWeight.at(-1)?.release}.`,
+      evidence: byWeight.map((row) => `${row.brand} ${row.release}: ${row.weightOz} oz`),
+    });
+  }
+
+  const plateGroups = uniq(rows.map((row) => String(row.isPlated)));
+  if (plateGroups.length > 1) {
+    const plated = rows.filter((row) => row.isPlated).map((row) => `${row.brand} ${row.release}`);
+    const nonPlated = rows.filter((row) => !row.isPlated).map((row) => `${row.brand} ${row.release}`);
+    insights.push({
+      title: "Ride construction",
+      summary: plated.length
+        ? `${plated.join(", ")} bring plated geometry into the mix, while ${nonPlated.join(", ")} stay non-plated.`
+        : "These shoes differ on plated versus non-plated construction.",
+      evidence: rows.map((row) => `${row.brand} ${row.release}: ${row.isPlated ? "Plated" : "Non-plated"}`),
+    });
+  }
+
+  const themeLeaders = rows
+    .map((row) => ({
+      row,
+      theme: row.reviewReconciliation.topTakeaways[0] ?? row.aiReviewSummary?.pros[0] ?? null,
+    }))
+    .filter((entry): entry is { row: ComparisonRow; theme: string } => Boolean(entry.theme));
+  if (themeLeaders.length >= 2) {
+    insights.push({
+      title: "Review read",
+      summary: themeLeaders.map((entry) => `${entry.row.brand} ${entry.row.release}: ${entry.theme}`).join(" "),
+      evidence: themeLeaders.map((entry) => `${entry.row.brand} ${entry.row.release}: ${entry.theme}`),
+    });
+  }
+
+  return insights;
+}
+
+function buildSharedSignals(rows: ComparisonRow[]) {
+  const shared = new Set<string>();
+
+  for (const row of rows) {
+    const candidates = [
+      ...(row.aiReviewSummary?.pros ?? []),
+      ...(row.reviewReconciliation.topTakeaways ?? []),
+    ];
+
+    for (const candidate of candidates) {
+      const normalized = normalizeSearchText(candidate);
+      if (
+        rows.every((other) =>
+          [...(other.aiReviewSummary?.pros ?? []), ...(other.reviewReconciliation.topTakeaways ?? [])]
+            .map((value) => normalizeSearchText(value))
+            .some((value) => value.includes(normalized.split(" ")[0] ?? "")),
+        )
+      ) {
+        shared.add(candidate);
+      }
+    }
+  }
+
+  return [...shared];
+}
+
+function lowerCaseFirst(value: string) {
+  return value.charAt(0).toLowerCase() + value.slice(1);
 }
 
 function filterCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
