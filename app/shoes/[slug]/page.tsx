@@ -102,6 +102,9 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                   {shoe.aiReviewSummary.sourceCount} sources / {shoe.aiReviewSummary.reviewCount} reviews
                 </span>
                 <span className="pill">{shoe.aiReviewSummary.provider}</span>
+                {shoe.aiReviewSummary.isEditorialOverride ? (
+                  <span className="pill">editorial override</span>
+                ) : null}
               </div>
               <dl className="spec-grid">
                 <div>
@@ -126,6 +129,20 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                 {shoe.aiReviewSummary.model ? ` with ${shoe.aiReviewSummary.model}` : ""}
                 .
               </p>
+              {shoe.aiReviewSummary.evidence.length ? (
+                <div className="review-list">
+                  {shoe.aiReviewSummary.evidence.map((evidence) => (
+                    <article className="review-card" key={`${evidence.sourceName}-${evidence.excerpt}`}>
+                      <div className="catalog-card-topline">
+                        <span className="pill">{evidence.sourceType}</span>
+                        <span className="pill">{evidence.sourceName}</span>
+                      </div>
+                      <h3>{evidence.title ?? "Evidence snippet"}</h3>
+                      <p className="detail-muted">{evidence.excerpt}</p>
+                    </article>
+                  ))}
+                </div>
+              ) : null}
             </>
           ) : (
             <p className="detail-muted">No AI summary has been generated for this release yet.</p>

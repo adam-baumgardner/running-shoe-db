@@ -380,3 +380,5 @@ The generated summary is editorially downstream of moderation:
 - only approved reviews are included
 - editors can still pin manual takeaways and notes above the automated summary
 - the generated summary can be regenerated as new approved reviews arrive
+- generated summaries should retain source evidence snippets for auditability
+- editors should be able to override the public AI summary without deleting the underlying generated version

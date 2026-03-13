@@ -13,6 +13,7 @@ const aiSummarySchema = z.object({
 });
 
 interface ReviewSummaryInput {
+  id?: string | null;
   title: string | null;
   excerpt: string | null;
   body: string | null;
@@ -172,6 +173,8 @@ async function generateWithOpenAi(
     sourceCount: new Set(input.reviews.map((review) => `${review.sourceType}:${review.sourceName}`)).size,
     model,
     provider: "openai" as const,
+    evidence: buildEvidence(input.reviews),
+    isEditorialOverride: false,
   };
 }
 
@@ -232,7 +235,21 @@ function buildHeuristicSummary(input: GenerateReleaseReviewSummaryInput & { revi
     generatedAt: new Date().toISOString(),
     model: null,
     provider: "heuristic" as const,
+    evidence: buildEvidence(input.reviews),
+    isEditorialOverride: false,
   };
+}
+
+function buildEvidence(reviews: ReviewSummaryInput[]) {
+  return reviews
+    .map((review) => ({
+      sourceName: review.sourceName,
+      sourceType: review.sourceType,
+      title: review.title,
+      excerpt: truncateText(review.excerpt ?? review.body ?? review.title, 220) ?? "",
+    }))
+    .filter((review) => review.excerpt)
+    .slice(0, 6);
 }
 
 function inferTerms(review: ReviewSummaryInput) {

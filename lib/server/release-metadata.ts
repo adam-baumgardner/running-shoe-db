@@ -20,6 +20,25 @@ export interface ReleaseAiReviewSummary {
   generatedAt: string;
   model: string | null;
   provider: "openai" | "heuristic";
+  evidence: Array<{
+    sourceName: string;
+    sourceType: "editorial" | "reddit" | "user";
+    title: string | null;
+    excerpt: string;
+  }>;
+  isEditorialOverride: boolean;
+}
+
+export interface ReleaseAiReviewSummaryOverride {
+  isEnabled: boolean;
+  overview: string | null;
+  overallSentiment: ReviewSentiment | null;
+  confidence: ReviewConfidence | null;
+  pros: string[];
+  cons: string[];
+  bestFor: string[];
+  watchOuts: string[];
+  updatedAt: string | null;
 }
 
 type ReleaseMetadataRecord = Record<string, unknown>;
@@ -27,22 +46,33 @@ type ReleaseMetadataRecord = Record<string, unknown>;
 export function mergeReleaseMetadata(
   metadata: unknown,
   patch: Partial<{
-    editorialReviewSummary: ReleaseEditorialReviewSummary;
-    aiReviewSummary: ReleaseAiReviewSummary;
+    editorialReviewSummary: ReleaseEditorialReviewSummary | null;
+    aiReviewSummary: ReleaseAiReviewSummary | null;
+    editorialAiReviewSummaryOverride: ReleaseAiReviewSummaryOverride | null;
   }>,
 ) {
   const base = asRecord(metadata);
   const next: ReleaseMetadataRecord = { ...base };
 
-  if (patch.editorialReviewSummary) {
+  if (patch.editorialReviewSummary === null) {
+    delete next.editorialReviewSummary;
+  } else if (patch.editorialReviewSummary) {
     next.editorialReviewSummary = {
       ...getReleaseReconciliationOverrides(base),
       ...patch.editorialReviewSummary,
     };
   }
 
-  if (patch.aiReviewSummary) {
+  if (patch.aiReviewSummary === null) {
+    delete next.aiReviewSummary;
+  } else if (patch.aiReviewSummary) {
     next.aiReviewSummary = patch.aiReviewSummary;
+  }
+
+  if (patch.editorialAiReviewSummaryOverride === null) {
+    delete next.editorialAiReviewSummaryOverride;
+  } else if (patch.editorialAiReviewSummaryOverride) {
+    next.editorialAiReviewSummaryOverride = patch.editorialAiReviewSummaryOverride;
   }
 
   return next;
@@ -60,6 +90,31 @@ export function getReleaseReconciliationOverrides(metadata: unknown): ReleaseEdi
 }
 
 export function getReleaseAiReviewSummary(metadata: unknown): ReleaseAiReviewSummary | null {
+  const generated = getStoredReleaseAiReviewSummary(metadata);
+  const override = getReleaseAiReviewSummaryOverride(metadata);
+
+  if (!generated) {
+    return null;
+  }
+
+  if (!override?.isEnabled) {
+    return generated;
+  }
+
+  return {
+    ...generated,
+    overview: override.overview ?? generated.overview,
+    overallSentiment: override.overallSentiment ?? generated.overallSentiment,
+    confidence: override.confidence ?? generated.confidence,
+    pros: override.pros.length ? override.pros : generated.pros,
+    cons: override.cons.length ? override.cons : generated.cons,
+    bestFor: override.bestFor.length ? override.bestFor : generated.bestFor,
+    watchOuts: override.watchOuts.length ? override.watchOuts : generated.watchOuts,
+    isEditorialOverride: true,
+  };
+}
+
+export function getStoredReleaseAiReviewSummary(metadata: unknown): ReleaseAiReviewSummary | null {
   const record = asRecord(asRecord(metadata).aiReviewSummary);
   const overview = typeof record.overview === "string" ? record.overview.trim() : "";
   const overallSentiment = readSentiment(record.overallSentiment);
@@ -86,6 +141,136 @@ export function getReleaseAiReviewSummary(metadata: unknown): ReleaseAiReviewSum
     generatedAt,
     model: typeof record.model === "string" ? record.model : null,
     provider,
+    evidence: readEvidenceList(record.evidence),
+    isEditorialOverride: false,
+  };
+}
+
+export function getReleaseAiReviewSummaryOverride(
+  metadata: unknown,
+): ReleaseAiReviewSummaryOverride | null {
+  const record = asRecord(asRecord(metadata).editorialAiReviewSummaryOverride);
+  const isEnabled = Boolean(record.isEnabled);
+  const updatedAt = typeof record.updatedAt === "string" ? record.updatedAt : null;
+
+  if (!isEnabled && !updatedAt) {
+    return null;
+  }
+
+  return {
+    isEnabled,
+    overview: typeof record.overview === "string" ? record.overview : null,
+    overallSentiment: readSentiment(record.overallSentiment),
+    confidence: readConfidence(record.confidence),
+    pros: readStringList(record.pros, 4),
+    cons: readStringList(record.cons, 4),
+    bestFor: readStringList(record.bestFor, 4),
+    watchOuts: readStringList(record.watchOuts, 4),
+    updatedAt,
+  };
+}
+
+function readEvidenceList(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+        return null;
+      }
+
+      const record = entry as Record<string, unknown>;
+      const sourceName = typeof record.sourceName === "string" ? record.sourceName : null;
+      const title = typeof record.title === "string" ? record.title : null;
+      const excerpt = typeof record.excerpt === "string" ? record.excerpt.trim() : "";
+      const sourceType =
+        record.sourceType === "editorial" || record.sourceType === "reddit" || record.sourceType === "user"
+          ? record.sourceType
+          : null;
+
+      if (!sourceName || !sourceType || !excerpt) {
+        return null;
+      }
+
+      return {
+        sourceName,
+        sourceType,
+        title,
+        excerpt,
+      };
+    })
+    .filter(
+      (
+        entry,
+      ): entry is {
+        sourceName: string;
+        sourceType: "editorial" | "reddit" | "user";
+        title: string | null;
+        excerpt: string;
+      } => Boolean(entry),
+    )
+    .slice(0, 6);
+}
+
+export function hasAnyAiReviewSummary(metadata: unknown) {
+  return Boolean(getStoredReleaseAiReviewSummary(metadata) || getReleaseAiReviewSummaryOverride(metadata));
+}
+
+export function getAiReviewSummaryGeneratedAt(metadata: unknown) {
+  return getStoredReleaseAiReviewSummary(metadata)?.generatedAt ?? null;
+}
+
+export function getAiReviewSummaryOverrideStatus(metadata: unknown) {
+  return Boolean(getReleaseAiReviewSummaryOverride(metadata)?.isEnabled);
+}
+
+export function getAiReviewSummaryPreview(metadata: unknown) {
+  return getReleaseAiReviewSummary(metadata)?.overview ?? null;
+}
+
+export function getAiReviewSummarySourceCount(metadata: unknown) {
+  return getStoredReleaseAiReviewSummary(metadata)?.sourceCount ?? 0;
+}
+
+export function getAiReviewSummaryReviewCount(metadata: unknown) {
+  return getStoredReleaseAiReviewSummary(metadata)?.reviewCount ?? 0;
+}
+
+export function getAiReviewSummaryEvidenceCount(metadata: unknown) {
+  return getStoredReleaseAiReviewSummary(metadata)?.evidence.length ?? 0;
+}
+
+export function getAiReviewSummaryDisplayStatus(metadata: unknown) {
+  const effective = getReleaseAiReviewSummary(metadata);
+  if (!effective) {
+    return "missing" as const;
+  }
+
+  return effective.isEditorialOverride ? "override" as const : "generated" as const;
+}
+
+export function getAiReviewSummaryOverrideFields(metadata: unknown) {
+  const override = getReleaseAiReviewSummaryOverride(metadata);
+  return {
+    isEnabled: override?.isEnabled ?? false,
+    overview: override?.overview ?? "",
+    overallSentiment: override?.overallSentiment ?? "",
+    confidence: override?.confidence ?? "",
+    pros: override?.pros.join("\n"),
+    cons: override?.cons.join("\n"),
+    bestFor: override?.bestFor.join("\n"),
+    watchOuts: override?.watchOuts.join("\n"),
+  } as {
+    isEnabled: boolean;
+    overview: string;
+    overallSentiment: string;
+    confidence: string;
+    pros: string;
+    cons: string;
+    bestFor: string;
+    watchOuts: string;
   };
 }
 

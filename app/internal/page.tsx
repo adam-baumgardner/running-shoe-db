@@ -9,6 +9,7 @@ import {
   runRedditRunningShoeGeeksCrawlAction,
   runRunRepeatCrawlAction,
   runScheduledIngestionAction,
+  updateAiReviewSummaryOverrideAction,
   updateCrawlSourceSettingsAction,
   updateReviewEditorialOverridesAction,
   updateReviewStatusAction,
@@ -688,10 +689,104 @@ export default async function InternalPage() {
               <div>{release.weightOzMen ? `${release.weightOzMen} oz` : "Pending"}</div>
               <div>{release.dropMm ? `${release.dropMm} mm` : "Pending"}</div>
               <div>
-                <span className="pill">{release.hasAiReviewSummary ? "generated" : "missing"}</span>
+                <span className="pill">{release.aiSummaryStatus}</span>
                 <p className="detail-muted">
                   {formatDateTime(release.aiSummaryGeneratedAt) ?? "No summary yet"}
                 </p>
+                {release.aiSummaryPreview ? (
+                  <p className="detail-muted">{release.aiSummaryPreview}</p>
+                ) : null}
+                <p className="detail-muted">
+                  {release.aiSummarySourceCount} sources / {release.aiSummaryReviewCount} reviews /{" "}
+                  {release.aiSummaryEvidenceCount} evidence snippets
+                </p>
+                <form action={generateAiReviewSummaryAction}>
+                  <input name="releaseId" type="hidden" value={release.id} />
+                  <button className="button-secondary" type="submit">
+                    Regenerate
+                  </button>
+                </form>
+                <details>
+                  <summary className="text-link">AI override</summary>
+                  <form action={updateAiReviewSummaryOverrideAction} className="editorial-form">
+                    <input name="releaseId" type="hidden" value={release.id} />
+                    <label className="filter-field checkbox-field">
+                      <span>Enable override</span>
+                      <input
+                        defaultChecked={release.aiSummaryOverrideFields.isEnabled}
+                        name="isEnabled"
+                        type="checkbox"
+                      />
+                    </label>
+                    <label className="filter-field">
+                      <span>Overview</span>
+                      <textarea
+                        defaultValue={release.aiSummaryOverrideFields.overview}
+                        name="overview"
+                        rows={4}
+                      />
+                    </label>
+                    <label className="filter-field">
+                      <span>Sentiment</span>
+                      <select
+                        defaultValue={release.aiSummaryOverrideFields.overallSentiment}
+                        name="overallSentiment"
+                      >
+                        <option value="">Unset</option>
+                        <option value="positive">Positive</option>
+                        <option value="mixed">Mixed</option>
+                        <option value="negative">Negative</option>
+                      </select>
+                    </label>
+                    <label className="filter-field">
+                      <span>Confidence</span>
+                      <select
+                        defaultValue={release.aiSummaryOverrideFields.confidence}
+                        name="confidence"
+                      >
+                        <option value="">Unset</option>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                    </label>
+                    <label className="filter-field">
+                      <span>Pros</span>
+                      <textarea
+                        defaultValue={release.aiSummaryOverrideFields.pros}
+                        name="pros"
+                        rows={4}
+                      />
+                    </label>
+                    <label className="filter-field">
+                      <span>Cons</span>
+                      <textarea
+                        defaultValue={release.aiSummaryOverrideFields.cons}
+                        name="cons"
+                        rows={4}
+                      />
+                    </label>
+                    <label className="filter-field">
+                      <span>Best for</span>
+                      <textarea
+                        defaultValue={release.aiSummaryOverrideFields.bestFor}
+                        name="bestFor"
+                        rows={4}
+                      />
+                    </label>
+                    <label className="filter-field">
+                      <span>Watch-outs</span>
+                      <textarea
+                        defaultValue={release.aiSummaryOverrideFields.watchOuts}
+                        name="watchOuts"
+                        rows={4}
+                      />
+                    </label>
+                    <button className="button-secondary" type="submit">
+                      Save AI override
+                    </button>
+                  </form>
+                </details>
               </div>
             </div>
           ))}

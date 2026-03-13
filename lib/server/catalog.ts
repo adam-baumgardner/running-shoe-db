@@ -132,6 +132,13 @@ export interface ShoeDetail {
     generatedAt: string;
     model: string | null;
     provider: "openai" | "heuristic";
+    evidence: Array<{
+      sourceName: string;
+      sourceType: "editorial" | "reddit" | "user";
+      title: string | null;
+      excerpt: string;
+    }>;
+    isEditorialOverride: boolean;
   } | null;
   reviews: ShoeReviewSummary[];
 }

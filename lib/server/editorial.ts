@@ -2,6 +2,17 @@ import { count, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
 import { brands, crawlRuns, crawlSources, reviewSources, reviews, shoeReleases, shoes, shoeSpecs } from "@/db/schema";
 import { assessCrawlDueState } from "@/lib/ingestion/scheduler";
+import {
+  getAiReviewSummaryDisplayStatus,
+  getAiReviewSummaryEvidenceCount,
+  getAiReviewSummaryGeneratedAt,
+  getAiReviewSummaryOverrideFields,
+  getAiReviewSummaryOverrideStatus,
+  getAiReviewSummaryPreview,
+  getAiReviewSummaryReviewCount,
+  getAiReviewSummarySourceCount,
+  hasAnyAiReviewSummary,
+} from "@/lib/server/release-metadata";
 
 export interface EditorialBrandOption {
   id: string;
@@ -62,6 +73,22 @@ export interface EditorialDashboardData {
     dropMm: number | null;
     hasAiReviewSummary: boolean;
     aiSummaryGeneratedAt: string | null;
+    aiSummaryStatus: "missing" | "generated" | "override";
+    aiSummaryPreview: string | null;
+    aiSummarySourceCount: number;
+    aiSummaryReviewCount: number;
+    aiSummaryEvidenceCount: number;
+    aiSummaryOverrideEnabled: boolean;
+    aiSummaryOverrideFields: {
+      isEnabled: boolean;
+      overview: string;
+      overallSentiment: string;
+      confidence: string;
+      pros: string;
+      cons: string;
+      bestFor: string;
+      watchOuts: string;
+    };
   }>;
   releaseCoverage: Array<{
     releaseId: string;
@@ -393,7 +420,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
     releases: releaseRows.map((release) => ({
       id: release.id,
       label: `${release.shoeName} ${release.versionName}`,
-      hasAiReviewSummary: hasAiReviewSummary(release.metadata),
+      hasAiReviewSummary: hasAnyAiReviewSummary(release.metadata),
     })),
     sources: sourceRows,
     recentReviews: reviewRows.map((review) => ({
@@ -417,8 +444,15 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       msrpUsd: release.msrpUsd ? Number(release.msrpUsd) : null,
       weightOzMen: release.weightOzMen ? Number(release.weightOzMen) : null,
       dropMm: release.dropMm,
-      hasAiReviewSummary: hasAiReviewSummary(release.metadata),
+      hasAiReviewSummary: hasAnyAiReviewSummary(release.metadata),
       aiSummaryGeneratedAt: getAiReviewSummaryGeneratedAt(release.metadata),
+      aiSummaryStatus: getAiReviewSummaryDisplayStatus(release.metadata),
+      aiSummaryPreview: getAiReviewSummaryPreview(release.metadata),
+      aiSummarySourceCount: getAiReviewSummarySourceCount(release.metadata),
+      aiSummaryReviewCount: getAiReviewSummaryReviewCount(release.metadata),
+      aiSummaryEvidenceCount: getAiReviewSummaryEvidenceCount(release.metadata),
+      aiSummaryOverrideEnabled: getAiReviewSummaryOverrideStatus(release.metadata),
+      aiSummaryOverrideFields: getAiReviewSummaryOverrideFields(release.metadata),
     })),
     releaseCoverage: [...coverageMap.entries()]
       .map(([releaseId, entry]) => ({
@@ -663,27 +697,4 @@ function getEditorialOverrideHistory(metadata: unknown) {
         duplicateOfReviewId: string | null;
       } => Boolean(entry),
     );
-}
-
-function hasAiReviewSummary(metadata: unknown) {
-  if (!metadata || typeof metadata !== "object") {
-    return false;
-  }
-
-  const aiReviewSummary = (metadata as Record<string, unknown>).aiReviewSummary;
-  return Boolean(aiReviewSummary && typeof aiReviewSummary === "object");
-}
-
-function getAiReviewSummaryGeneratedAt(metadata: unknown) {
-  if (!metadata || typeof metadata !== "object") {
-    return null;
-  }
-
-  const aiReviewSummary = (metadata as Record<string, unknown>).aiReviewSummary;
-  if (!aiReviewSummary || typeof aiReviewSummary !== "object") {
-    return null;
-  }
-
-  const generatedAt = (aiReviewSummary as Record<string, unknown>).generatedAt;
-  return typeof generatedAt === "string" ? generatedAt : null;
 }

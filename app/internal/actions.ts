@@ -298,10 +298,22 @@ export async function updateReviewStatusAction(formData: FormData) {
     throw new Error("Review id and status are required.");
   }
 
+  const review = await db.query.reviews.findFirst({
+    where: eq(reviews.id, reviewId),
+  });
+
+  if (!review) {
+    throw new Error("Review not found.");
+  }
+
   await db.update(reviews).set({ status }).where(eq(reviews.id, reviewId));
+  const shoeSlug = await regenerateAiReviewSummaryForRelease(db, review.releaseId);
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
+  if (shoeSlug) {
+    revalidatePath(`/shoes/${shoeSlug}`);
+  }
 }
 
 export async function updateReviewEditorialOverridesAction(formData: FormData) {
@@ -381,8 +393,13 @@ export async function updateReviewEditorialOverridesAction(formData: FormData) {
     })
     .where(eq(reviews.id, reviewId));
 
+  const shoeSlug = await regenerateAiReviewSummaryForRelease(db, review.releaseId);
+
   revalidatePath("/internal");
   revalidatePath("/shoes");
+  if (shoeSlug) {
+    revalidatePath(`/shoes/${shoeSlug}`);
+  }
 }
 
 export async function updateCrawlSourceSettingsAction(formData: FormData) {
@@ -478,6 +495,83 @@ export async function generateAiReviewSummaryAction(formData: FormData) {
     throw new Error("Release is required.");
   }
 
+  const slug = await regenerateAiReviewSummaryForRelease(db, releaseId);
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+  if (slug) {
+    revalidatePath(`/shoes/${slug}`);
+  }
+}
+
+export async function updateAiReviewSummaryOverrideAction(formData: FormData) {
+  const db = requireDatabase();
+  const releaseId = String(formData.get("releaseId") ?? "").trim();
+  const isEnabled = formData.get("isEnabled") === "on";
+  const overview = String(formData.get("overview") ?? "").trim();
+  const overallSentimentRaw = String(formData.get("overallSentiment") ?? "").trim();
+  const confidenceRaw = String(formData.get("confidence") ?? "").trim();
+  const prosRaw = String(formData.get("pros") ?? "").trim();
+  const consRaw = String(formData.get("cons") ?? "").trim();
+  const bestForRaw = String(formData.get("bestFor") ?? "").trim();
+  const watchOutsRaw = String(formData.get("watchOuts") ?? "").trim();
+
+  if (!releaseId) {
+    throw new Error("Release is required.");
+  }
+
+  const release = await db
+    .select({
+      id: shoeReleases.id,
+      metadata: shoeReleases.metadata,
+      shoeSlug: shoes.slug,
+    })
+    .from(shoeReleases)
+    .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+    .where(eq(shoeReleases.id, releaseId))
+    .limit(1);
+
+  const row = release[0];
+  if (!row) {
+    throw new Error("Release not found.");
+  }
+
+  await db
+    .update(shoeReleases)
+    .set({
+      metadata: mergeReleaseMetadata(row.metadata, {
+        editorialAiReviewSummaryOverride: {
+          isEnabled,
+          overview: overview || null,
+          overallSentiment:
+            overallSentimentRaw === "positive" ||
+            overallSentimentRaw === "mixed" ||
+            overallSentimentRaw === "negative"
+              ? overallSentimentRaw
+              : null,
+          confidence:
+            confidenceRaw === "low" || confidenceRaw === "medium" || confidenceRaw === "high"
+              ? confidenceRaw
+              : null,
+          pros: parseLineList(prosRaw, 4),
+          cons: parseLineList(consRaw, 4),
+          bestFor: parseLineList(bestForRaw, 4),
+          watchOuts: parseLineList(watchOutsRaw, 4),
+          updatedAt: new Date().toISOString(),
+        },
+      }),
+    })
+    .where(eq(shoeReleases.id, releaseId));
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+  revalidatePath(`/shoes/${row.shoeSlug}`);
+}
+
+async function regenerateAiReviewSummaryForRelease(
+  db: ReturnType<typeof requireDatabase>,
+  releaseId: string,
+) {
   const release = await db
     .select({
       id: shoeReleases.id,
@@ -503,6 +597,7 @@ export async function generateAiReviewSummaryAction(formData: FormData) {
 
   const approvedReviews = await db
     .select({
+      id: reviews.id,
       title: reviews.title,
       excerpt: reviews.excerpt,
       body: reviews.body,
@@ -517,6 +612,19 @@ export async function generateAiReviewSummaryAction(formData: FormData) {
     .innerJoin(reviewSources, eq(reviews.sourceId, reviewSources.id))
     .leftJoin(reviewAuthors, eq(reviews.authorId, reviewAuthors.id))
     .where(and(eq(reviews.releaseId, releaseId), eq(reviews.status, "approved")));
+
+  if (!approvedReviews.length) {
+    await db
+      .update(shoeReleases)
+      .set({
+        metadata: mergeReleaseMetadata(row.metadata, {
+          aiReviewSummary: null,
+        }),
+      })
+      .where(eq(shoeReleases.id, releaseId));
+
+    return row.shoeSlug;
+  }
 
   const summary = await generateReleaseReviewSummary({
     releaseLabel: `${row.brandName} ${row.versionName}`,
@@ -538,9 +646,7 @@ export async function generateAiReviewSummaryAction(formData: FormData) {
     })
     .where(eq(shoeReleases.id, releaseId));
 
-  revalidatePath("/internal");
-  revalidatePath("/shoes");
-  revalidatePath(`/shoes/${row.shoeSlug}`);
+  return row.shoeSlug;
 }
 
 function slugify(value: string) {
@@ -549,4 +655,12 @@ function slugify(value: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function parseLineList(value: string, limit: number) {
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, limit);
 }
