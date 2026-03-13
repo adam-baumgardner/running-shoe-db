@@ -130,6 +130,9 @@ Needs:
 - moderate review status
 - override sentiment and highlights
 - mark duplicates
+- pin or override release-level takeaways
+- ignore misleading reconciled themes
+- add editorial release-summary notes above automated reconciliation
 - control crawl-source cadence and activation
 - manually trigger crawls
 

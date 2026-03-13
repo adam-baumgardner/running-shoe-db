@@ -103,6 +103,7 @@ export const shoeReleases = pgTable(
     foam: varchar("foam", { length: 160 }),
     upperMaterial: varchar("upper_material", { length: 160 }),
     notes: text("notes"),
+    metadata: jsonb("metadata"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },

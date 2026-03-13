@@ -129,6 +129,9 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
             These themes are reconciled across all approved sources for this release, regardless of
             whether the input came from editorial reviews or community discussion.
           </p>
+          {shoe.reviewReconciliation.summaryNote ? (
+            <p className="catalog-copy">{shoe.reviewReconciliation.summaryNote}</p>
+          ) : null}
           <p className="detail-muted">
             {shoe.reviewReconciliation.contradictionCount} contradiction
             {shoe.reviewReconciliation.contradictionCount === 1 ? "" : "s"} detected across the

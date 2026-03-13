@@ -125,10 +125,31 @@ export async function upsertReleaseAction(formData: FormData) {
   const dropMmRaw = String(formData.get("dropMm") ?? "").trim();
   const fitNotes = String(formData.get("fitNotes") ?? "").trim();
   const sourceNotes = String(formData.get("sourceNotes") ?? "").trim();
+  const editorialSummaryNote = String(formData.get("editorialSummaryNote") ?? "").trim();
+  const pinnedTakeawaysRaw = String(formData.get("pinnedTakeaways") ?? "").trim();
+  const ignoredThemesRaw = String(formData.get("ignoredThemes") ?? "").trim();
 
   if (!shoeId || !versionName) {
     throw new Error("Shoe and version name are required.");
   }
+
+  const pinnedTakeaways = pinnedTakeawaysRaw
+    .split("\n")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  const ignoredThemes = ignoredThemesRaw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 8);
+  const metadata = {
+    editorialReviewSummary: {
+      summaryNote: editorialSummaryNote || null,
+      pinnedTakeaways,
+      ignoredThemes,
+    },
+  };
 
   const inserted = await db
     .insert(shoeReleases)
@@ -141,6 +162,7 @@ export async function upsertReleaseAction(formData: FormData) {
       isPlated,
       foam: foam || null,
       notes: notes || null,
+      metadata,
     })
     .onConflictDoUpdate({
       target: [shoeReleases.shoeId, shoeReleases.versionName],
@@ -151,6 +173,7 @@ export async function upsertReleaseAction(formData: FormData) {
         isPlated,
         foam: foam || null,
         notes: notes || null,
+        metadata,
       },
     })
     .returning({ id: shoeReleases.id });

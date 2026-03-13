@@ -281,6 +281,26 @@ export default async function InternalPage() {
               <span>Source notes</span>
               <textarea name="sourceNotes" rows={4} />
             </label>
+            <label className="filter-field">
+              <span>Editorial summary note</span>
+              <textarea
+                name="editorialSummaryNote"
+                rows={3}
+                placeholder="Optional manual summary shown above automated reconciliation."
+              />
+            </label>
+            <label className="filter-field">
+              <span>Pinned takeaways</span>
+              <textarea
+                name="pinnedTakeaways"
+                rows={4}
+                placeholder="One takeaway per line"
+              />
+            </label>
+            <label className="filter-field">
+              <span>Ignored themes</span>
+              <input name="ignoredThemes" placeholder="Fit, Value" />
+            </label>
             <button className="button-primary" type="submit">
               Save release
             </button>

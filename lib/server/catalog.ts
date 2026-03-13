@@ -101,6 +101,7 @@ export interface ShoeDetail {
     sourceCount: number;
   };
   reviewReconciliation: {
+    summaryNote: string | null;
     topTakeaways: string[];
     contradictionCount: number;
     themes: Array<{
@@ -232,6 +233,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
         stability: shoes.stability,
         usageSummary: shoes.usageSummary,
         notes: shoeReleases.notes,
+        metadata: shoeReleases.metadata,
         priceUsd: shoeReleases.msrpUsd,
         releaseYear: shoeReleases.releaseYear,
         isCurrent: shoeReleases.isCurrent,
@@ -266,6 +268,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
         shoes.usageSummary,
         shoeReleases.versionName,
         shoeReleases.notes,
+        shoeReleases.metadata,
         shoeReleases.msrpUsd,
         shoeReleases.releaseYear,
         shoeReleases.isCurrent,
@@ -346,7 +349,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       reviewCount: Number(row.reviewCount),
       averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
       reviewSignalSummary: aggregateReviewSignals(mappedReviews),
-      reviewReconciliation: reconcileReviewEvidence(mappedReviews),
+      reviewReconciliation: reconcileReviewEvidence(mappedReviews, row.metadata),
       reviews: mappedReviews,
     };
   } catch {
@@ -373,7 +376,9 @@ function reconcileReviewEvidence(
       body?: string | null;
     }
   >,
+  releaseMetadata?: unknown,
 ) {
+  const overrides = getReleaseReconciliationOverrides(releaseMetadata);
   const themeMap = new Map<
     string,
     {
@@ -437,12 +442,16 @@ function reconcileReviewEvidence(
 
       return right.reviewCount - left.reviewCount;
     })
+    .filter((theme) => !overrides.ignoredThemes.includes(theme.label))
     .slice(0, 5);
 
   return {
     themes,
     contradictionCount: themes.filter((theme) => theme.hasContradiction).length,
-    topTakeaways: buildThemeTakeaways(themes),
+    topTakeaways: overrides.pinnedTakeaways.length
+      ? overrides.pinnedTakeaways
+      : buildThemeTakeaways(themes),
+    summaryNote: overrides.summaryNote,
   };
 }
 
@@ -524,6 +533,36 @@ function buildThemeTakeaways(
 
     return `${theme.label} ${sentimentVerb} with ${theme.confidence} confidence.`;
   });
+}
+
+function getReleaseReconciliationOverrides(metadata: unknown) {
+  if (!metadata || typeof metadata !== "object") {
+    return {
+      summaryNote: null,
+      pinnedTakeaways: [] as string[],
+      ignoredThemes: [] as string[],
+    };
+  }
+
+  const summary = (metadata as Record<string, unknown>).editorialReviewSummary;
+  if (!summary || typeof summary !== "object") {
+    return {
+      summaryNote: null,
+      pinnedTakeaways: [] as string[],
+      ignoredThemes: [] as string[],
+    };
+  }
+
+  const record = summary as Record<string, unknown>;
+  return {
+    summaryNote: typeof record.summaryNote === "string" ? record.summaryNote : null,
+    pinnedTakeaways: Array.isArray(record.pinnedTakeaways)
+      ? record.pinnedTakeaways.filter((item): item is string => typeof item === "string").slice(0, 5)
+      : [],
+    ignoredThemes: Array.isArray(record.ignoredThemes)
+      ? record.ignoredThemes.filter((item): item is string => typeof item === "string").slice(0, 8)
+      : [],
+  };
 }
 
 function aggregateReviewSignals(reviews: ShoeReviewSummary[]) {
@@ -798,6 +837,7 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
       sourceCount: 1,
     },
     reviewReconciliation: {
+      summaryNote: "Fallback editorial summary for environments without live database access.",
       topTakeaways: ["Cushioning leans positive with medium confidence."],
       contradictionCount: 0,
       themes: [
