@@ -307,12 +307,12 @@ export async function updateReviewStatusAction(formData: FormData) {
   }
 
   await db.update(reviews).set({ status }).where(eq(reviews.id, reviewId));
-  const shoeSlug = await regenerateAiReviewSummaryForRelease(db, review.releaseId);
+  const result = await regenerateAiReviewSummaryForRelease(db, review.releaseId);
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
-  if (shoeSlug) {
-    revalidatePath(`/shoes/${shoeSlug}`);
+  if (result.shoeSlug) {
+    revalidatePath(`/shoes/${result.shoeSlug}`);
   }
 }
 
@@ -393,12 +393,12 @@ export async function updateReviewEditorialOverridesAction(formData: FormData) {
     })
     .where(eq(reviews.id, reviewId));
 
-  const shoeSlug = await regenerateAiReviewSummaryForRelease(db, review.releaseId);
+  const result = await regenerateAiReviewSummaryForRelease(db, review.releaseId);
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
-  if (shoeSlug) {
-    revalidatePath(`/shoes/${shoeSlug}`);
+  if (result.shoeSlug) {
+    revalidatePath(`/shoes/${result.shoeSlug}`);
   }
 }
 
@@ -495,13 +495,56 @@ export async function generateAiReviewSummaryAction(formData: FormData) {
     throw new Error("Release is required.");
   }
 
-  const slug = await regenerateAiReviewSummaryForRelease(db, releaseId);
+  const result = await regenerateAiReviewSummaryForRelease(db, releaseId);
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
-  if (slug) {
-    revalidatePath(`/shoes/${slug}`);
+  if (result.shoeSlug) {
+    revalidatePath(`/shoes/${result.shoeSlug}`);
   }
+}
+
+export async function generateMissingAiReviewSummariesAction() {
+  const db = requireDatabase();
+  const releaseRows = await db
+    .select({
+      id: shoeReleases.id,
+      metadata: shoeReleases.metadata,
+    })
+    .from(shoeReleases)
+    .orderBy(shoeReleases.createdAt);
+
+  let generatedCount = 0;
+  let refreshedCount = 0;
+  let skippedCount = 0;
+
+  for (const release of releaseRows.slice(0, 50)) {
+    const hadSummary =
+      release.metadata &&
+      typeof release.metadata === "object" &&
+      Boolean((release.metadata as Record<string, unknown>).aiReviewSummary);
+
+    const result = await regenerateAiReviewSummaryForRelease(db, release.id);
+    if (result.status !== "generated") {
+      skippedCount += 1;
+      continue;
+    }
+
+    if (hadSummary) {
+      refreshedCount += 1;
+    } else {
+      generatedCount += 1;
+    }
+  }
+
+  console.info("AI summary batch run completed", {
+    generatedCount,
+    refreshedCount,
+    skippedCount,
+  });
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
 }
 
 export async function updateAiReviewSummaryOverrideAction(formData: FormData) {
@@ -592,7 +635,10 @@ async function regenerateAiReviewSummaryForRelease(
 
   const row = release[0];
   if (!row) {
-    throw new Error("Release not found.");
+    return {
+      status: "missing-release" as const,
+      shoeSlug: null,
+    };
   }
 
   const approvedReviews = await db
@@ -623,7 +669,10 @@ async function regenerateAiReviewSummaryForRelease(
       })
       .where(eq(shoeReleases.id, releaseId));
 
-    return row.shoeSlug;
+    return {
+      status: "cleared" as const,
+      shoeSlug: row.shoeSlug,
+    };
   }
 
   const summary = await generateReleaseReviewSummary({
@@ -646,7 +695,10 @@ async function regenerateAiReviewSummaryForRelease(
     })
     .where(eq(shoeReleases.id, releaseId));
 
-  return row.shoeSlug;
+  return {
+    status: "generated" as const,
+    shoeSlug: row.shoeSlug,
+  };
 }
 
 function slugify(value: string) {

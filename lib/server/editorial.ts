@@ -34,6 +34,8 @@ export interface EditorialReleaseOption {
   id: string;
   label: string;
   hasAiReviewSummary?: boolean;
+  approvedReviewCount?: number;
+  aiSummaryStatus?: "missing" | "generated" | "override";
 }
 
 export interface EditorialReviewRow {
@@ -421,6 +423,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       id: release.id,
       label: `${release.shoeName} ${release.versionName}`,
       hasAiReviewSummary: hasAnyAiReviewSummary(release.metadata),
+      aiSummaryStatus: getAiReviewSummaryDisplayStatus(release.metadata),
     })),
     sources: sourceRows,
     recentReviews: reviewRows.map((review) => ({

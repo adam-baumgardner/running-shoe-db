@@ -4,6 +4,7 @@ import {
   createReviewSourceAction,
   createShoeModelAction,
   generateAiReviewSummaryAction,
+  generateMissingAiReviewSummariesAction,
   runBelieveInTheRunCrawlAction,
   runDoctorsOfRunningCrawlAction,
   runRedditRunningShoeGeeksCrawlAction,
@@ -333,6 +334,11 @@ export default async function InternalPage() {
             </p>
             <button className="button-primary" type="submit">
               Generate AI summary
+            </button>
+          </form>
+          <form action={generateMissingAiReviewSummariesAction}>
+            <button className="button-secondary" type="submit">
+              Batch generate AI summaries
             </button>
           </form>
         </article>
