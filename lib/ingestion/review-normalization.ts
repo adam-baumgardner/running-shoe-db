@@ -28,7 +28,7 @@ const NEGATIVE_SIGNALS = [
   "awkward",
 ];
 
-const HIGHLIGHT_PATTERNS = [
+export const HIGHLIGHT_PATTERNS = [
   {
     label: "Cushioning",
     patterns: ["cushion", "soft", "firm", "stack", "foam", "protective"],

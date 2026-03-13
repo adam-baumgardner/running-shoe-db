@@ -1,6 +1,7 @@
 import { and, avg, count, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { shoes as fallbackShoes } from "@/lib/data";
+import { HIGHLIGHT_PATTERNS, normalizeSearchText } from "@/lib/ingestion/review-normalization";
 import {
   brands,
   reviewAuthors,
@@ -98,6 +99,19 @@ export interface ShoeDetail {
     };
     dominantSentiment: "positive" | "mixed" | "negative" | null;
     sourceCount: number;
+  };
+  reviewReconciliation: {
+    themes: Array<{
+      label: string;
+      dominantSentiment: "positive" | "mixed" | "negative";
+      sourceCount: number;
+      reviewCount: number;
+      evidence: Array<{
+        sourceName: string;
+        sourceType: "editorial" | "reddit" | "user";
+        excerpt: string;
+      }>;
+    }>;
   };
   reviews: ShoeReviewSummary[];
 }
@@ -271,6 +285,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
         id: reviews.id,
         title: reviews.title,
         excerpt: reviews.excerpt,
+        body: reviews.body,
         scoreNormalized100: reviews.scoreNormalized100,
         sentiment: reviews.sentiment,
         publishedAt: reviews.publishedAt,
@@ -290,6 +305,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       id: review.id,
       title: review.title,
       excerpt: review.excerpt,
+      body: review.body,
       highlights: getReviewHighlights(review.metadata),
       scoreNormalized100: review.scoreNormalized100,
       sentiment: review.sentiment,
@@ -326,6 +342,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       reviewCount: Number(row.reviewCount),
       averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
       reviewSignalSummary: aggregateReviewSignals(mappedReviews),
+      reviewReconciliation: reconcileReviewEvidence(mappedReviews),
       reviews: mappedReviews,
     };
   } catch {
@@ -344,6 +361,105 @@ function getReviewHighlights(metadata: unknown) {
   }
 
   return maybeHighlights.filter((value): value is string => typeof value === "string").slice(0, 3);
+}
+
+function reconcileReviewEvidence(
+  reviews: Array<
+    ShoeReviewSummary & {
+      body?: string | null;
+    }
+  >,
+) {
+  const themeMap = new Map<
+    string,
+    {
+      positive: number;
+      mixed: number;
+      negative: number;
+      sources: Set<string>;
+      reviewIds: Set<string>;
+      evidence: Array<{
+        sourceName: string;
+        sourceType: "editorial" | "reddit" | "user";
+        excerpt: string;
+      }>;
+    }
+  >();
+
+  for (const review of reviews) {
+    const themeLabels = inferThemeLabels(review);
+    for (const label of themeLabels) {
+      const entry = themeMap.get(label) ?? {
+        positive: 0,
+        mixed: 0,
+        negative: 0,
+        sources: new Set<string>(),
+        reviewIds: new Set<string>(),
+        evidence: [],
+      };
+
+      const sentiment = review.sentiment ?? "mixed";
+      entry[sentiment] += 1;
+      entry.sources.add(`${review.sourceType}:${review.sourceName}`);
+      entry.reviewIds.add(review.id);
+
+      const excerpt = (review.excerpt ?? review.body ?? "").trim();
+      if (excerpt && entry.evidence.length < 3) {
+        entry.evidence.push({
+          sourceName: review.sourceName,
+          sourceType: review.sourceType,
+          excerpt: excerpt.slice(0, 180),
+        });
+      }
+
+      themeMap.set(label, entry);
+    }
+  }
+
+  const themes = [...themeMap.entries()]
+    .map(([label, entry]) => ({
+      label,
+      dominantSentiment: getDominantThemeSentiment(entry),
+      sourceCount: entry.sources.size,
+      reviewCount: entry.reviewIds.size,
+      evidence: entry.evidence,
+    }))
+    .sort((left, right) => {
+      if (right.sourceCount !== left.sourceCount) {
+        return right.sourceCount - left.sourceCount;
+      }
+
+      return right.reviewCount - left.reviewCount;
+    })
+    .slice(0, 5);
+
+  return { themes };
+}
+
+function inferThemeLabels(
+  review: ShoeReviewSummary & {
+    body?: string | null;
+  },
+) {
+  const explicit = review.highlights;
+  const haystack = normalizeSearchText(`${review.excerpt ?? ""} ${review.body ?? ""}`);
+  const inferred = HIGHLIGHT_PATTERNS.filter(({ patterns }) =>
+    patterns.some((pattern) => haystack.includes(pattern)),
+  ).map((pattern) => pattern.label);
+
+  return uniq([...explicit, ...inferred]);
+}
+
+function getDominantThemeSentiment(entry: { positive: number; mixed: number; negative: number }) {
+  if (entry.positive >= entry.mixed && entry.positive >= entry.negative) {
+    return "positive" as const;
+  }
+
+  if (entry.negative >= entry.mixed && entry.negative >= entry.positive) {
+    return "negative" as const;
+  }
+
+  return "mixed" as const;
 }
 
 function aggregateReviewSignals(reviews: ShoeReviewSummary[]) {
@@ -616,6 +732,23 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
       },
       dominantSentiment: "positive",
       sourceCount: 1,
+    },
+    reviewReconciliation: {
+      themes: [
+        {
+          label: "Cushioning",
+          dominantSentiment: "positive",
+          sourceCount: 1,
+          reviewCount: 1,
+          evidence: [
+            {
+              sourceName: "Seed Source",
+              sourceType: "editorial",
+              excerpt: "Fallback review content for environments without database access.",
+            },
+          ],
+        },
+      ],
     },
     reviews: [
       {

@@ -123,6 +123,39 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
         </article>
 
         <article className="detail-panel">
+          <p className="feature-kicker">Reconciliation</p>
+          <h2>Source-agnostic themes</h2>
+          <p>
+            These themes are reconciled across all approved sources for this release, regardless of
+            whether the input came from editorial reviews or community discussion.
+          </p>
+          <div className="review-list">
+            {shoe.reviewReconciliation.themes.length ? (
+              shoe.reviewReconciliation.themes.map((theme) => (
+                <article className="review-card" key={theme.label}>
+                  <div className="catalog-card-topline">
+                    <span className="pill">{theme.label}</span>
+                    <span className="pill">{theme.dominantSentiment}</span>
+                    <span className="pill">{theme.sourceCount} sources</span>
+                  </div>
+                  <p className="catalog-copy">
+                    Observed in {theme.reviewCount} approved reviews across {theme.sourceCount}{" "}
+                    sources.
+                  </p>
+                  {theme.evidence.map((evidence) => (
+                    <p className="detail-muted" key={`${theme.label}-${evidence.sourceName}`}>
+                      {evidence.sourceName} ({evidence.sourceType}): {evidence.excerpt}
+                    </p>
+                  ))}
+                </article>
+              ))
+            ) : (
+              <p className="detail-muted">No reconciled themes yet.</p>
+            )}
+          </div>
+        </article>
+
+        <article className="detail-panel">
           <p className="feature-kicker">Reviews</p>
           <h2>Source-backed review signals</h2>
           <p>
