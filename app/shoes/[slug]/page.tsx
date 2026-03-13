@@ -129,6 +129,22 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
             These themes are reconciled across all approved sources for this release, regardless of
             whether the input came from editorial reviews or community discussion.
           </p>
+          <p className="detail-muted">
+            {shoe.reviewReconciliation.contradictionCount} contradiction
+            {shoe.reviewReconciliation.contradictionCount === 1 ? "" : "s"} detected across the
+            current theme set.
+          </p>
+          <div className="detail-chip-row">
+            {shoe.reviewReconciliation.topTakeaways.length ? (
+              shoe.reviewReconciliation.topTakeaways.map((takeaway) => (
+                <span className="pill" key={takeaway}>
+                  {takeaway}
+                </span>
+              ))
+            ) : (
+              <span className="pill">No reconciled takeaways yet</span>
+            )}
+          </div>
           <div className="review-list">
             {shoe.reviewReconciliation.themes.length ? (
               shoe.reviewReconciliation.themes.map((theme) => (
@@ -136,7 +152,9 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                   <div className="catalog-card-topline">
                     <span className="pill">{theme.label}</span>
                     <span className="pill">{theme.dominantSentiment}</span>
+                    <span className="pill">{theme.confidence} confidence</span>
                     <span className="pill">{theme.sourceCount} sources</span>
+                    {theme.hasContradiction ? <span className="pill">contested</span> : null}
                   </div>
                   <p className="catalog-copy">
                     Observed in {theme.reviewCount} approved reviews across {theme.sourceCount}{" "}

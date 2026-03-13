@@ -101,9 +101,13 @@ export interface ShoeDetail {
     sourceCount: number;
   };
   reviewReconciliation: {
+    topTakeaways: string[];
+    contradictionCount: number;
     themes: Array<{
       label: string;
       dominantSentiment: "positive" | "mixed" | "negative";
+      confidence: "low" | "medium" | "high";
+      hasContradiction: boolean;
       sourceCount: number;
       reviewCount: number;
       evidence: Array<{
@@ -420,6 +424,8 @@ function reconcileReviewEvidence(
     .map(([label, entry]) => ({
       label,
       dominantSentiment: getDominantThemeSentiment(entry),
+      confidence: getThemeConfidence(entry),
+      hasContradiction: entry.positive > 0 && entry.negative > 0,
       sourceCount: entry.sources.size,
       reviewCount: entry.reviewIds.size,
       evidence: entry.evidence,
@@ -433,7 +439,11 @@ function reconcileReviewEvidence(
     })
     .slice(0, 5);
 
-  return { themes };
+  return {
+    themes,
+    contradictionCount: themes.filter((theme) => theme.hasContradiction).length,
+    topTakeaways: buildThemeTakeaways(themes),
+  };
 }
 
 function inferThemeLabels(
@@ -460,6 +470,60 @@ function getDominantThemeSentiment(entry: { positive: number; mixed: number; neg
   }
 
   return "mixed" as const;
+}
+
+function getThemeConfidence(entry: {
+  positive: number;
+  mixed: number;
+  negative: number;
+  sources: Set<string>;
+  reviewIds: Set<string>;
+}) {
+  const reviewCount = entry.reviewIds.size;
+  const sourceCount = entry.sources.size;
+  const dominantSentiment = getDominantThemeSentiment(entry);
+  const dominantCount =
+    dominantSentiment === "positive"
+      ? entry.positive
+      : dominantSentiment === "negative"
+        ? entry.negative
+        : entry.mixed;
+  const agreementRatio = reviewCount > 0 ? dominantCount / reviewCount : 0;
+
+  if (sourceCount >= 2 && reviewCount >= 2 && agreementRatio >= 0.7) {
+    return "high" as const;
+  }
+
+  if (sourceCount >= 1 && reviewCount >= 1 && agreementRatio >= 0.5) {
+    return "medium" as const;
+  }
+
+  return "low" as const;
+}
+
+function buildThemeTakeaways(
+  themes: Array<{
+    label: string;
+    dominantSentiment: "positive" | "mixed" | "negative";
+    confidence: "low" | "medium" | "high";
+    hasContradiction: boolean;
+    sourceCount: number;
+  }>,
+) {
+  return themes.slice(0, 3).map((theme) => {
+    if (theme.hasContradiction) {
+      return `${theme.label} is contested across ${theme.sourceCount} sources.`;
+    }
+
+    const sentimentVerb =
+      theme.dominantSentiment === "positive"
+        ? "leans positive"
+        : theme.dominantSentiment === "negative"
+          ? "leans negative"
+          : "is mixed";
+
+    return `${theme.label} ${sentimentVerb} with ${theme.confidence} confidence.`;
+  });
 }
 
 function aggregateReviewSignals(reviews: ShoeReviewSummary[]) {
@@ -734,10 +798,14 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
       sourceCount: 1,
     },
     reviewReconciliation: {
+      topTakeaways: ["Cushioning leans positive with medium confidence."],
+      contradictionCount: 0,
       themes: [
         {
           label: "Cushioning",
           dominantSentiment: "positive",
+          confidence: "medium",
+          hasContradiction: false,
           sourceCount: 1,
           reviewCount: 1,
           evidence: [
