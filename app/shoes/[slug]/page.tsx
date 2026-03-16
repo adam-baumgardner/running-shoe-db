@@ -68,6 +68,24 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
         </aside>
       </section>
 
+      <section className="detail-panel release-rail-panel">
+        <p className="feature-kicker">Version Rail</p>
+        <h2>Jump between releases</h2>
+        <div className="release-rail">
+          {shoe.releases.map((release, index) => (
+            <a
+              className={`release-rail-item ${index === 0 ? "release-rail-item--active" : ""}`}
+              href={`/shoes/${shoe.slug}/${release.releaseSlug}`}
+              key={release.id}
+            >
+              <strong>{release.release}</strong>
+              <span>{release.releaseYear ?? "Pending year"}</span>
+              <span>{release.reviewCoverage.status} coverage</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
       <section className="detail-grid">
         <article className="detail-panel">
           <p className="feature-kicker">Latest Release</p>

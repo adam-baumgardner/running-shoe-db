@@ -1,17 +1,27 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getReleaseDetail } from "@/lib/server/catalog";
+import { getReleaseDetail, getShoeParentPageData } from "@/lib/server/catalog";
 
 interface ReleaseDetailPageProps {
   params: { slug: string; release: string };
 }
 
 export default async function ReleaseDetailPage({ params }: ReleaseDetailPageProps) {
-  const shoe = await getReleaseDetail(params.slug, params.release);
+  const [shoe, parent] = await Promise.all([
+    getReleaseDetail(params.slug, params.release),
+    getShoeParentPageData(params.slug),
+  ]);
 
-  if (!shoe) {
+  if (!shoe || !parent) {
     notFound();
   }
+
+  const currentReleaseIndex = parent.releases.findIndex((release) => release.releaseSlug === params.release);
+  const newerRelease = currentReleaseIndex > 0 ? parent.releases[currentReleaseIndex - 1] : null;
+  const olderRelease =
+    currentReleaseIndex >= 0 && currentReleaseIndex < parent.releases.length - 1
+      ? parent.releases[currentReleaseIndex + 1]
+      : null;
 
   return (
     <main className="page-shell detail-shell">
@@ -61,6 +71,38 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             </Link>
           </div>
         </aside>
+      </section>
+
+      <section className="detail-panel release-rail-panel">
+        <p className="feature-kicker">Version Rail</p>
+        <h2>Browse releases</h2>
+        <div className="release-rail">
+          {parent.releases.map((release) => (
+            <a
+              className={`release-rail-item ${
+                release.releaseSlug === params.release ? "release-rail-item--active" : ""
+              }`}
+              href={`/shoes/${shoe.slug}/${release.releaseSlug}`}
+              key={release.id}
+            >
+              <strong>{release.release}</strong>
+              <span>{release.releaseYear ?? "Pending year"}</span>
+              <span>{release.reviewCoverage.status} coverage</span>
+            </a>
+          ))}
+        </div>
+        <div className="card-actions">
+          {newerRelease ? (
+            <a className="text-link" href={`/shoes/${shoe.slug}/${newerRelease.releaseSlug}`}>
+              Newer: {newerRelease.release}
+            </a>
+          ) : null}
+          {olderRelease ? (
+            <a className="text-link" href={`/shoes/${shoe.slug}/${olderRelease.releaseSlug}`}>
+              Older: {olderRelease.release}
+            </a>
+          ) : null}
+        </div>
       </section>
 
       <section className="detail-grid">
