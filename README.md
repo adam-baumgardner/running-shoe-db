@@ -68,6 +68,11 @@ The first automated crawl loop is now exposed at `/api/cron/ingest`.
 - `CRON_SECRET` can be used for authenticated manual calls
 - crawl source cadence and active state are managed from `/internal`
 
+## Health and smoke checks
+
+- Deployed health endpoint: `/api/health`
+- Local merge-prep smoke check: `npm run smoke`
+
 ## AI review summaries
 
 Release-level AI summaries are generated from approved reviews only.
@@ -80,3 +85,4 @@ Release-level AI summaries are generated from approved reviews only.
 
 - Current checkpoint summary: [docs/checkpoints/2026-03-16.md](/Users/adambaumgardner/Documents/Documents/Django/running-shoe-db/docs/checkpoints/2026-03-16.md)
 - Living product requirements: [docs/prd.md](/Users/adambaumgardner/Documents/Documents/Django/running-shoe-db/docs/prd.md)
+- Merge-prep checklist: [docs/merge-prep.md](/Users/adambaumgardner/Documents/Documents/Django/running-shoe-db/docs/merge-prep.md)
