@@ -71,7 +71,7 @@ a {
 .page-shell {
   width: min(1100px, calc(100% - 2rem));
   margin: 0 auto;
-  padding: 4rem 0 5rem;
+  padding: 2.75rem 0 4.5rem;
 }
 
 .hero {
@@ -100,8 +100,8 @@ a {
 }
 
 .hero h1 {
-  font-size: clamp(3.2rem, 8vw, 6.3rem);
-  max-width: 9ch;
+  font-size: clamp(2.7rem, 6vw, 4.8rem);
+  max-width: 11ch;
 }
 
 .hero-copy {

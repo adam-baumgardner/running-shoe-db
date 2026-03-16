@@ -4,14 +4,15 @@ export default function HomePage() {
   return (
     <main className="page-shell">
       <section className="hero">
-        <p className="eyebrow">Foundation rebuild</p>
-        <h1>Running shoe comparison built around specs, reviews, and buyer context.</h1>
+        <p className="eyebrow">Review checkpoint</p>
+        <h1>Running shoe research built around releases, reviews, and real buying context.</h1>
         <p className="hero-copy">
-          The first release will focus on a clean catalog, high-signal filters, source-backed
-          reviews, and side-by-side comparison for road and trail runners.
+          Stride Stack now has release-aware catalog pages, source-backed review aggregation, AI
+          summaries, multi-source comparison, and internal editorial tooling for ingestion and
+          moderation. The next phase is stabilization, polish, and deployment hardening.
         </p>
         <div className="hero-card">
-          <p className="hero-card-label">Featured prototype entry</p>
+          <p className="hero-card-label">Featured release</p>
           <h2>
             {featuredShoe.brand} {featuredShoe.name}
           </h2>

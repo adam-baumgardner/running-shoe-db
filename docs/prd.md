@@ -5,7 +5,7 @@
 - Status: active working PRD
 - Product: Stride Stack
 - Repo branch: `codex/rebuild-foundation`
-- Last updated: March 12, 2026
+- Last updated: March 16, 2026
 
 This document is the product source of truth for the rebuild. It should be updated as product scope, data strategy, editorial policy, and technical architecture evolve.
 
@@ -143,8 +143,17 @@ Needs:
 - source-specific runners for:
   - Believe in the Run
   - Reddit `r/RunningShoeGeeks`
+  - RunRepeat
+  - Doctors of Running
 - normalization of excerpts, sentiment, highlights, and duplicate fingerprints
 - moderation gate before public visibility
+
+### Release-aware public experience
+
+- The public product must distinguish between shoe families and release versions.
+- The parent shoe page must feature the latest release while preserving access to older versions.
+- Each release must have its own detail page, review set, AI summary, and comparison identity.
+- The product should explain what changed between adjacent releases using structured diffs first, then review intelligence when evidence is strong enough.
 
 ## 9. Future scope
 
@@ -219,6 +228,8 @@ Needs:
 - Shoe detail pages must show review-source attribution.
 - Shoe detail pages must show release-level consensus derived from approved reviews.
 - Consensus should use source-aware weighting and freshness weighting.
+- The public product should expose AI-generated release summaries with editorial override support.
+- The compare view should remain release-aware rather than collapsing to parent shoe-family pages.
 
 ## 12. Success metrics
 
