@@ -286,6 +286,12 @@ a {
   background: transparent;
 }
 
+.text-link--cta {
+  border-color: rgba(199, 81, 45, 0.35);
+  background: rgba(199, 81, 45, 0.08);
+  color: var(--accent);
+}
+
 .catalog-meta {
   margin-top: 1rem;
   color: var(--muted);

@@ -77,15 +77,24 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
         <h2>Jump between releases</h2>
         <div className="release-rail">
           {shoe.releases.map((release, index) => (
-            <a
+            <div
               className={`release-rail-item ${index === 0 ? "release-rail-item--active" : ""}`}
-              href={`/shoes/${shoe.slug}/${release.releaseSlug}`}
               key={release.id}
             >
-              <strong>{release.release}</strong>
+              <a href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
+                <strong>{release.release}</strong>
+              </a>
               <span>{release.releaseYear ?? "Pending year"}</span>
               <span>{release.reviewCoverage.status} coverage</span>
-            </a>
+              <div className="card-actions">
+                <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
+                  Open
+                </a>
+                <a className="text-link text-link--cta" href={`/compare?release=${release.id}`}>
+                  Compare
+                </a>
+              </div>
+            </div>
           ))}
         </div>
       </section>
@@ -164,7 +173,7 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                   getReleaseIdBySlug(change.releaseSlug) &&
                   getReleaseIdByName(change.previousRelease) ? (
                     <a
-                      className="text-link"
+                      className="text-link text-link--cta"
                       href={`/compare?release=${getReleaseIdBySlug(change.releaseSlug)}&release=${getReleaseIdByName(change.previousRelease)}`}
                     >
                       Compare versions

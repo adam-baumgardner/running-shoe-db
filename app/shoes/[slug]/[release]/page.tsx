@@ -79,17 +79,26 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
         <h2>Browse releases</h2>
         <div className="release-rail">
           {parent.releases.map((release) => (
-            <a
+            <div
               className={`release-rail-item ${
                 release.releaseSlug === params.release ? "release-rail-item--active" : ""
               }`}
-              href={`/shoes/${shoe.slug}/${release.releaseSlug}`}
               key={release.id}
             >
-              <strong>{release.release}</strong>
+              <a href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
+                <strong>{release.release}</strong>
+              </a>
               <span>{release.releaseYear ?? "Pending year"}</span>
               <span>{release.reviewCoverage.status} coverage</span>
-            </a>
+              <div className="card-actions">
+                <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
+                  Open
+                </a>
+                <a className="text-link text-link--cta" href={`/compare?release=${release.id}`}>
+                  Compare
+                </a>
+              </div>
+            </div>
           ))}
         </div>
         <div className="card-actions">
@@ -100,7 +109,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               </a>
               {currentReleaseId ? (
                 <a
-                  className="text-link"
+                  className="text-link text-link--cta"
                   href={`/compare?release=${currentReleaseId}&release=${newerRelease.id}`}
                 >
                   Compare with newer
@@ -115,7 +124,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               </a>
               {currentReleaseId ? (
                 <a
-                  className="text-link"
+                  className="text-link text-link--cta"
                   href={`/compare?release=${currentReleaseId}&release=${olderRelease.id}`}
                 >
                   Compare with older
