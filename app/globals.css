@@ -419,6 +419,13 @@ a {
   color: var(--muted);
 }
 
+.compare-slot-form {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+  margin-bottom: 1rem;
+}
+
 @media (max-width: 900px) {
   .hero,
   .section-grid,

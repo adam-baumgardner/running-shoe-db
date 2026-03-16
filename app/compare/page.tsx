@@ -17,6 +17,10 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     getComparisonPageData(selectedReleaseIds),
   ]);
   const selectedRows = comparison.rows;
+  const releaseOptions = catalog.map((shoe) => ({
+    id: shoe.id,
+    label: `${shoe.brand} ${shoe.release}`,
+  }));
 
   return (
     <main className="page-shell">
@@ -110,6 +114,26 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
             <h2>
               {shoe.brand} {shoe.release}
             </h2>
+            <form action="/compare" className="compare-slot-form">
+              {selectedReleaseIds.map((releaseId, index) =>
+                releaseId === shoe.id ? null : (
+                  <input key={`${shoe.id}-${releaseId}-${index}`} name="release" type="hidden" value={releaseId} />
+                ),
+              )}
+              <label className="filter-field">
+                <span>Swap release</span>
+                <select defaultValue={shoe.id} name="release">
+                  {releaseOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="button-secondary" type="submit">
+                Swap
+              </button>
+            </form>
             <p className="catalog-copy">{shoe.rideProfile}</p>
             {shoe.aiReviewSummary ? (
               <p className="detail-muted">{shoe.aiReviewSummary.overview}</p>
