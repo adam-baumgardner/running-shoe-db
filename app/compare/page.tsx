@@ -164,7 +164,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
               Freshest review: {shoe.reviewCoverage.freshestReviewDate ?? "Unknown"}
             </p>
             <div className="card-actions">
-              <Link className="text-link" href={`/shoes/${shoe.slug}`}>
+              <Link className="text-link" href={`/shoes/${shoe.slug}/${shoe.releaseSlug}`}>
                 Open shoe detail
               </Link>
             </div>

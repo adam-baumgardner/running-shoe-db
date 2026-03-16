@@ -150,7 +150,40 @@ export interface ShoeDetail {
   reviews: ShoeReviewSummary[];
 }
 
+export interface ShoeReleaseListItem {
+  id: string;
+  release: string;
+  releaseSlug: string;
+  releaseYear: number | null;
+  isCurrent: boolean;
+  priceUsd: number | null;
+  reviewCount: number;
+  averageReviewScore: number | null;
+  reviewCoverage: ShoeDetail["reviewCoverage"];
+}
+
+export interface ReleaseChangeSummary {
+  release: string;
+  releaseSlug: string;
+  previousRelease: string | null;
+  changes: string[];
+}
+
+export interface ShoeParentPageData {
+  brand: string;
+  model: string;
+  slug: string;
+  category: string;
+  terrain: string;
+  stability: string;
+  usageSummary: string | null;
+  featuredRelease: ShoeDetail;
+  releases: ShoeReleaseListItem[];
+  releaseChanges: ReleaseChangeSummary[];
+}
+
 export interface ComparisonRow extends CatalogCard {
+  releaseSlug: string;
   priceUsd: number | null;
   heelStackMm: number | null;
   forefootStackMm: number | null;
@@ -405,6 +438,238 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
     };
   } catch {
     return buildFallbackDetail(slug);
+  }
+}
+
+export async function getReleaseDetail(
+  shoeSlug: string,
+  releaseSlug: string,
+): Promise<ShoeDetail | null> {
+  if (!process.env.DATABASE_URL) {
+    return buildFallbackDetail(shoeSlug);
+  }
+
+  try {
+    const db = getDb();
+    const rows = await db
+      .select({
+        id: shoeReleases.id,
+        brand: brands.name,
+        model: shoes.name,
+        release: shoeReleases.versionName,
+        slug: shoes.slug,
+        category: shoes.category,
+        terrain: shoes.terrain,
+        stability: shoes.stability,
+        usageSummary: shoes.usageSummary,
+        notes: shoeReleases.notes,
+        metadata: shoeReleases.metadata,
+        priceUsd: shoeReleases.msrpUsd,
+        releaseYear: shoeReleases.releaseYear,
+        isCurrent: shoeReleases.isCurrent,
+        isPlated: shoeReleases.isPlated,
+        foam: shoeReleases.foam,
+        weightOzMen: shoeSpecs.weightOzMen,
+        heelStackMm: shoeSpecs.heelStackMm,
+        forefootStackMm: shoeSpecs.forefootStackMm,
+        dropMm: shoeSpecs.dropMm,
+        fitNotes: shoeSpecs.fitNotes,
+        sourceNotes: shoeSpecs.sourceNotes,
+        reviewCount: count(reviews.id),
+        averageReviewScore: avg(reviews.scoreNormalized100),
+      })
+      .from(shoeReleases)
+      .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+      .innerJoin(brands, eq(shoes.brandId, brands.id))
+      .leftJoin(shoeSpecs, eq(shoeSpecs.releaseId, shoeReleases.id))
+      .leftJoin(reviews, and(eq(reviews.releaseId, shoeReleases.id), eq(reviews.status, "approved")))
+      .where(eq(shoes.slug, shoeSlug))
+      .groupBy(
+        shoeReleases.id,
+        brands.name,
+        shoes.name,
+        shoes.slug,
+        shoes.category,
+        shoes.terrain,
+        shoes.stability,
+        shoes.usageSummary,
+        shoeReleases.versionName,
+        shoeReleases.notes,
+        shoeReleases.metadata,
+        shoeReleases.msrpUsd,
+        shoeReleases.releaseYear,
+        shoeReleases.isCurrent,
+        shoeReleases.isPlated,
+        shoeReleases.foam,
+        shoeSpecs.weightOzMen,
+        shoeSpecs.heelStackMm,
+        shoeSpecs.forefootStackMm,
+        shoeSpecs.dropMm,
+        shoeSpecs.fitNotes,
+        shoeSpecs.sourceNotes,
+      )
+      .orderBy(desc(shoeReleases.releaseYear));
+
+    const row = rows.find((candidate) => slugifyRelease(candidate.release) === releaseSlug) ?? null;
+    if (!row) {
+      return null;
+    }
+
+    const reviewRows = await db
+      .select({
+        id: reviews.id,
+        title: reviews.title,
+        excerpt: reviews.excerpt,
+        body: reviews.body,
+        scoreNormalized100: reviews.scoreNormalized100,
+        sentiment: reviews.sentiment,
+        publishedAt: reviews.publishedAt,
+        metadata: reviews.metadata,
+        sourceName: reviewSources.name,
+        sourceType: reviewSources.sourceType,
+        sourceUrl: reviews.sourceUrl,
+        authorName: reviewAuthors.displayName,
+      })
+      .from(reviews)
+      .innerJoin(reviewSources, eq(reviews.sourceId, reviewSources.id))
+      .leftJoin(reviewAuthors, eq(reviews.authorId, reviewAuthors.id))
+      .where(and(eq(reviews.releaseId, row.id), eq(reviews.status, "approved")))
+      .orderBy(desc(reviews.publishedAt));
+
+    return buildShoeDetailFromRow(row, reviewRows);
+  } catch {
+    return buildFallbackDetail(shoeSlug);
+  }
+}
+
+export async function getShoeParentPageData(slug: string): Promise<ShoeParentPageData | null> {
+  if (!process.env.DATABASE_URL) {
+    const fallback = buildFallbackDetail(slug);
+    if (!fallback) return null;
+
+    return {
+      brand: fallback.brand,
+      model: fallback.model,
+      slug: fallback.slug,
+      category: fallback.category,
+      terrain: fallback.terrain,
+      stability: fallback.stability,
+      usageSummary: fallback.usageSummary,
+      featuredRelease: fallback,
+      releases: [
+        {
+          id: fallback.id,
+          release: fallback.release,
+          releaseSlug: slugifyRelease(fallback.release),
+          releaseYear: fallback.releaseYear,
+          isCurrent: fallback.isCurrent,
+          priceUsd: fallback.priceUsd,
+          reviewCount: fallback.reviewCount,
+          averageReviewScore: fallback.averageReviewScore,
+          reviewCoverage: fallback.reviewCoverage,
+        },
+      ],
+      releaseChanges: [],
+    };
+  }
+
+  try {
+    const db = getDb();
+    const rows = await db
+      .select({
+        id: shoeReleases.id,
+        brand: brands.name,
+        model: shoes.name,
+        shoeSlug: shoes.slug,
+        category: shoes.category,
+        terrain: shoes.terrain,
+        stability: shoes.stability,
+        usageSummary: shoes.usageSummary,
+        release: shoeReleases.versionName,
+        releaseYear: shoeReleases.releaseYear,
+        isCurrent: shoeReleases.isCurrent,
+        isPlated: shoeReleases.isPlated,
+        foam: shoeReleases.foam,
+        notes: shoeReleases.notes,
+        metadata: shoeReleases.metadata,
+        priceUsd: shoeReleases.msrpUsd,
+        weightOzMen: shoeSpecs.weightOzMen,
+        heelStackMm: shoeSpecs.heelStackMm,
+        forefootStackMm: shoeSpecs.forefootStackMm,
+        dropMm: shoeSpecs.dropMm,
+        fitNotes: shoeSpecs.fitNotes,
+        sourceNotes: shoeSpecs.sourceNotes,
+        reviewCount: count(reviews.id),
+        averageReviewScore: avg(reviews.scoreNormalized100),
+      })
+      .from(shoeReleases)
+      .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+      .innerJoin(brands, eq(shoes.brandId, brands.id))
+      .leftJoin(shoeSpecs, eq(shoeSpecs.releaseId, shoeReleases.id))
+      .leftJoin(reviews, and(eq(reviews.releaseId, shoeReleases.id), eq(reviews.status, "approved")))
+      .where(eq(shoes.slug, slug))
+      .groupBy(
+        shoeReleases.id,
+        brands.name,
+        shoes.name,
+        shoes.slug,
+        shoes.category,
+        shoes.terrain,
+        shoes.stability,
+        shoes.usageSummary,
+        shoeReleases.versionName,
+        shoeReleases.releaseYear,
+        shoeReleases.isCurrent,
+        shoeReleases.isPlated,
+        shoeReleases.foam,
+        shoeReleases.notes,
+        shoeReleases.metadata,
+        shoeReleases.msrpUsd,
+        shoeSpecs.weightOzMen,
+        shoeSpecs.heelStackMm,
+        shoeSpecs.forefootStackMm,
+        shoeSpecs.dropMm,
+        shoeSpecs.fitNotes,
+        shoeSpecs.sourceNotes,
+      )
+      .orderBy(desc(shoeReleases.releaseYear), desc(shoeReleases.releaseDate));
+
+    const featured = rows[0];
+    if (!featured) {
+      return null;
+    }
+
+    const featuredDetail = await getReleaseDetail(slug, slugifyRelease(featured.release));
+    if (!featuredDetail) {
+      return null;
+    }
+
+    const releases = rows.map((row) => ({
+      id: row.id,
+      release: row.release,
+      releaseSlug: slugifyRelease(row.release),
+      releaseYear: row.releaseYear,
+      isCurrent: row.isCurrent,
+      priceUsd: row.priceUsd ? Number(row.priceUsd) : null,
+      reviewCount: Number(row.reviewCount),
+      averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
+      reviewCoverage: assessComparisonRowCoverage(row.metadata, Number(row.reviewCount)),
+    }));
+
+    return {
+      brand: featured.brand,
+      model: featured.model,
+      slug: featured.shoeSlug,
+      category: humanizeCategory(featured.category),
+      terrain: humanizeCategory(featured.terrain),
+      stability: capitalize(featured.stability),
+      usageSummary: featured.usageSummary,
+      featuredRelease: featuredDetail,
+      releases,
+      releaseChanges: buildReleaseChangeSummaries(rows),
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -822,6 +1087,7 @@ export async function getComparisonRows(selectedSlugs: string[]): Promise<Compar
       model: row.model,
       release: row.release,
       slug: row.slug,
+      releaseSlug: slugifyRelease(row.release),
       category: humanizeCategory(row.category),
       terrain: humanizeCategory(row.terrain),
       stability: capitalize(row.stability),
@@ -974,6 +1240,7 @@ function buildFallbackComparison(shoes: CatalogCard[]): ComparisonRow[] {
   const source = shoes.length ? shoes : buildFallbackCatalog().slice(0, 3);
   return source.map((shoe, index) => ({
     ...shoe,
+    releaseSlug: slugifyRelease(shoe.release),
     priceUsd: index === 1 ? 170 : 140,
     heelStackMm: shoe.dropMm ? shoe.dropMm + 28 : null,
     forefootStackMm: 28,
@@ -993,6 +1260,168 @@ function buildFallbackComparison(shoes: CatalogCard[]): ComparisonRow[] {
       themes: [],
     },
   }));
+}
+
+function buildShoeDetailFromRow(
+  row: {
+    id: string;
+    brand: string;
+    model: string;
+    release: string;
+    slug: string;
+    category: string;
+    terrain: string;
+    stability: string;
+    usageSummary: string | null;
+    notes: string | null;
+    metadata: unknown;
+    priceUsd: string | null;
+    releaseYear: number | null;
+    isCurrent: boolean;
+    isPlated: boolean;
+    foam: string | null;
+    weightOzMen: string | null;
+    heelStackMm: number | null;
+    forefootStackMm: number | null;
+    dropMm: number | null;
+    fitNotes: string | null;
+    sourceNotes: string | null;
+    reviewCount: number | string;
+    averageReviewScore: string | null;
+  },
+  reviewRows: Array<{
+    id: string;
+    title: string | null;
+    excerpt: string | null;
+    body: string | null;
+    scoreNormalized100: number | null;
+    sentiment: "positive" | "mixed" | "negative" | null;
+    publishedAt: Date | null;
+    metadata: unknown;
+    sourceName: string;
+    sourceType: "editorial" | "reddit" | "user";
+    sourceUrl: string;
+    authorName: string | null;
+  }>,
+): ShoeDetail {
+  const mappedReviews = reviewRows.map((review) => ({
+    id: review.id,
+    title: review.title,
+    excerpt: review.excerpt,
+    body: review.body,
+    highlights: getReviewHighlights(review.metadata),
+    scoreNormalized100: review.scoreNormalized100,
+    sentiment: review.sentiment,
+    publishedAt: review.publishedAt ? review.publishedAt.toISOString().slice(0, 10) : null,
+    sourceName: review.sourceName,
+    sourceType: review.sourceType,
+    sourceUrl: review.sourceUrl,
+    authorName: review.authorName,
+  }));
+
+  return {
+    id: row.id,
+    brand: row.brand,
+    model: row.model,
+    release: row.release,
+    slug: row.slug,
+    category: humanizeCategory(row.category),
+    terrain: humanizeCategory(row.terrain),
+    stability: capitalize(row.stability),
+    usageSummary: row.usageSummary,
+    rideProfile: buildRideProfile(row.foam, row.isPlated),
+    notes: row.notes,
+    priceUsd: row.priceUsd ? Number(row.priceUsd) : null,
+    releaseYear: row.releaseYear,
+    isCurrent: row.isCurrent,
+    isPlated: row.isPlated,
+    foam: row.foam,
+    weightOz: row.weightOzMen ? Number(row.weightOzMen) : null,
+    heelStackMm: row.heelStackMm,
+    forefootStackMm: row.forefootStackMm,
+    dropMm: row.dropMm,
+    fitNotes: row.fitNotes,
+    sourceNotes: row.sourceNotes,
+    reviewCount: Number(row.reviewCount),
+    averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
+    reviewCoverage: assessReviewCoverage(mappedReviews),
+    reviewSignalSummary: aggregateReviewSignals(mappedReviews),
+    reviewReconciliation: reconcileReviewEvidence(mappedReviews, row.metadata),
+    aiReviewSummary: getReleaseAiReviewSummary(row.metadata),
+    reviews: mappedReviews,
+  };
+}
+
+function buildReleaseChangeSummaries(
+  rows: Array<{
+    release: string;
+    releaseYear: number | null;
+    isPlated: boolean;
+    foam: string | null;
+    priceUsd: string | null;
+    weightOzMen: string | null;
+    heelStackMm: number | null;
+    forefootStackMm: number | null;
+    dropMm: number | null;
+    metadata: unknown;
+  }>,
+): ReleaseChangeSummary[] {
+  const changes: ReleaseChangeSummary[] = [];
+
+  for (let index = 0; index < rows.length; index += 1) {
+    const current = rows[index];
+    const previous = rows[index + 1] ?? null;
+    if (!previous) {
+      changes.push({
+        release: current.release,
+        releaseSlug: slugifyRelease(current.release),
+        previousRelease: null,
+        changes: ["Earliest tracked release in the current catalog."],
+      });
+      continue;
+    }
+
+    const items: string[] = [];
+    if (current.foam !== previous.foam) {
+      items.push(`Foam changed from ${previous.foam ?? "unknown"} to ${current.foam ?? "unknown"}.`);
+    }
+    if (current.isPlated !== previous.isPlated) {
+      items.push(current.isPlated ? "Plate added to this version." : "Plate removed from this version.");
+    }
+    if (current.priceUsd !== previous.priceUsd) {
+      items.push(
+        `MSRP moved from ${formatUsd(previous.priceUsd)} to ${formatUsd(current.priceUsd)}.`,
+      );
+    }
+    if (current.weightOzMen !== previous.weightOzMen) {
+      items.push(
+        `Men's weight shifted from ${formatOz(previous.weightOzMen)} to ${formatOz(current.weightOzMen)}.`,
+      );
+    }
+    if (current.heelStackMm !== previous.heelStackMm || current.forefootStackMm !== previous.forefootStackMm) {
+      items.push(
+        `Stack changed from ${formatStack(previous.heelStackMm, previous.forefootStackMm)} to ${formatStack(current.heelStackMm, current.forefootStackMm)}.`,
+      );
+    }
+    if (current.dropMm !== previous.dropMm) {
+      items.push(`Drop changed from ${formatMm(previous.dropMm)} to ${formatMm(current.dropMm)}.`);
+    }
+
+    const currentSummary = getReleaseAiReviewSummary(current.metadata);
+    const previousSummary = getReleaseAiReviewSummary(previous.metadata);
+    if (currentSummary?.overview && previousSummary?.overview && currentSummary.overview !== previousSummary.overview) {
+      items.push(`Review read shifted from “${previousSummary.overview}” to “${currentSummary.overview}”.`);
+    }
+
+    changes.push({
+      release: current.release,
+      releaseSlug: slugifyRelease(current.release),
+      previousRelease: previous.release,
+      changes: items.length ? items.slice(0, 4) : ["No major structured changes detected from the previous version."],
+    });
+  }
+
+  return changes;
 }
 
 function buildComparisonReconciliationFromMetadata(metadata: unknown): ShoeDetail["reviewReconciliation"] {
@@ -1182,6 +1611,34 @@ function buildSharedSignals(rows: ComparisonRow[]) {
 
 function lowerCaseFirst(value: string) {
   return value.charAt(0).toLowerCase() + value.slice(1);
+}
+
+function slugifyRelease(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function formatUsd(value: string | null) {
+  return value ? `$${Number(value)}` : "unknown";
+}
+
+function formatOz(value: string | null) {
+  return value ? `${Number(value)} oz` : "unknown";
+}
+
+function formatStack(heel: number | null, forefoot: number | null) {
+  if (heel && forefoot) {
+    return `${heel}/${forefoot} mm`;
+  }
+
+  return "unknown";
+}
+
+function formatMm(value: number | null) {
+  return value ? `${value} mm` : "unknown";
 }
 
 function assessComparisonConfidence(rows: ComparisonRow[]) {
