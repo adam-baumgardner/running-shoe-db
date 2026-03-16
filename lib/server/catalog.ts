@@ -1409,8 +1409,37 @@ function buildReleaseChangeSummaries(
 
     const currentSummary = getReleaseAiReviewSummary(current.metadata);
     const previousSummary = getReleaseAiReviewSummary(previous.metadata);
-    if (currentSummary?.overview && previousSummary?.overview && currentSummary.overview !== previousSummary.overview) {
-      items.push(`Review read shifted from “${previousSummary.overview}” to “${currentSummary.overview}”.`);
+    if (previousSummary && currentSummary && canCompareReviewShift(currentSummary, previousSummary)) {
+      const prev = previousSummary;
+      const curr = currentSummary;
+      const sentimentShift = describeSentimentShift(prev, curr);
+      if (sentimentShift) {
+        items.push(sentimentShift);
+      }
+
+      const bestForShift = describeListShift(
+        prev.bestFor,
+        curr.bestFor,
+        "Best-for signal moved from",
+      );
+      if (bestForShift) {
+        items.push(bestForShift);
+      }
+
+      const prosShift = describeListShift(
+        prev.pros,
+        curr.pros,
+        "Reviewers shifted from",
+      );
+      if (prosShift) {
+        items.push(prosShift);
+      }
+    } else if (
+      currentSummary?.overview &&
+      previousSummary?.overview &&
+      currentSummary.overview !== previousSummary.overview
+    ) {
+      items.push("Review read changed, but cross-version evidence is still too thin for a stronger claim.");
     }
 
     changes.push({
@@ -1639,6 +1668,44 @@ function formatStack(heel: number | null, forefoot: number | null) {
 
 function formatMm(value: number | null) {
   return value ? `${value} mm` : "unknown";
+}
+
+function canCompareReviewShift(
+  previousSummary: ShoeDetail["aiReviewSummary"],
+  currentSummary: ShoeDetail["aiReviewSummary"],
+ ) {
+  if (!previousSummary || !currentSummary) {
+    return false;
+  }
+
+  return (
+    previousSummary.reviewCount >= 2 &&
+    currentSummary.reviewCount >= 2 &&
+    previousSummary.sourceCount >= 1 &&
+    currentSummary.sourceCount >= 1
+  );
+}
+
+function describeSentimentShift(
+  previousSummary: NonNullable<ShoeDetail["aiReviewSummary"]>,
+  currentSummary: NonNullable<ShoeDetail["aiReviewSummary"]>,
+) {
+  if (previousSummary.overallSentiment === currentSummary.overallSentiment) {
+    return null;
+  }
+
+  return `Overall review sentiment shifted from ${previousSummary.overallSentiment} to ${currentSummary.overallSentiment}.`;
+}
+
+function describeListShift(previous: string[], current: string[], prefix: string) {
+  const previousLead = previous[0];
+  const currentLead = current[0];
+
+  if (!previousLead || !currentLead || previousLead === currentLead) {
+    return null;
+  }
+
+  return `${prefix} “${previousLead}” to “${currentLead}”.`;
 }
 
 function assessComparisonConfidence(rows: ComparisonRow[]) {
