@@ -17,6 +17,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   }
 
   const currentReleaseIndex = parent.releases.findIndex((release) => release.releaseSlug === params.release);
+  const currentReleaseId = currentReleaseIndex >= 0 ? parent.releases[currentReleaseIndex]?.id ?? null : null;
   const newerRelease = currentReleaseIndex > 0 ? parent.releases[currentReleaseIndex - 1] : null;
   const olderRelease =
     currentReleaseIndex >= 0 && currentReleaseIndex < parent.releases.length - 1
@@ -93,14 +94,34 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
         </div>
         <div className="card-actions">
           {newerRelease ? (
-            <a className="text-link" href={`/shoes/${shoe.slug}/${newerRelease.releaseSlug}`}>
-              Newer: {newerRelease.release}
-            </a>
+            <>
+              <a className="text-link" href={`/shoes/${shoe.slug}/${newerRelease.releaseSlug}`}>
+                Newer: {newerRelease.release}
+              </a>
+              {currentReleaseId ? (
+                <a
+                  className="text-link"
+                  href={`/compare?release=${currentReleaseId}&release=${newerRelease.id}`}
+                >
+                  Compare with newer
+                </a>
+              ) : null}
+            </>
           ) : null}
           {olderRelease ? (
-            <a className="text-link" href={`/shoes/${shoe.slug}/${olderRelease.releaseSlug}`}>
-              Older: {olderRelease.release}
-            </a>
+            <>
+              <a className="text-link" href={`/shoes/${shoe.slug}/${olderRelease.releaseSlug}`}>
+                Older: {olderRelease.release}
+              </a>
+              {currentReleaseId ? (
+                <a
+                  className="text-link"
+                  href={`/compare?release=${currentReleaseId}&release=${olderRelease.id}`}
+                >
+                  Compare with older
+                </a>
+              ) : null}
+            </>
           ) : null}
         </div>
       </section>

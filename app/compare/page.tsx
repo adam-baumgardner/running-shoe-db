@@ -2,19 +2,19 @@ import Link from "next/link";
 import { getCatalogCards, getComparisonPageData } from "@/lib/server/catalog";
 
 interface ComparePageProps {
-  searchParams: Promise<{ shoe?: string | string[] }>;
+  searchParams: Promise<{ release?: string | string[]; shoe?: string | string[] }>;
 }
 
 export default async function ComparePage({ searchParams }: ComparePageProps) {
   const resolvedSearchParams = await searchParams;
-  const selectedSlugs = Array.isArray(resolvedSearchParams.shoe)
-    ? resolvedSearchParams.shoe
-    : resolvedSearchParams.shoe
-      ? [resolvedSearchParams.shoe]
+  const selectedReleaseIds = Array.isArray(resolvedSearchParams.release)
+    ? resolvedSearchParams.release
+    : resolvedSearchParams.release
+      ? [resolvedSearchParams.release]
       : [];
   const [catalog, comparison] = await Promise.all([
     getCatalogCards(),
-    getComparisonPageData(selectedSlugs),
+    getComparisonPageData(selectedReleaseIds),
   ]);
   const selectedRows = comparison.rows;
 
@@ -34,11 +34,11 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       <section className="filter-shell">
         <form className="compare-picker" action="/compare">
           {catalog.map((shoe) => {
-            const checked = selectedSlugs.includes(shoe.slug);
+            const checked = selectedReleaseIds.includes(shoe.id);
 
             return (
-              <label key={shoe.slug} className="compare-option">
-                <input defaultChecked={checked} name="shoe" type="checkbox" value={shoe.slug} />
+              <label key={shoe.id} className="compare-option">
+                <input defaultChecked={checked} name="release" type="checkbox" value={shoe.id} />
                 <span>
                   {shoe.brand} {shoe.release}
                 </span>

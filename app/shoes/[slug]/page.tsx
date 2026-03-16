@@ -14,6 +14,10 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
   }
 
   const featuredReleaseHref = `/shoes/${shoe.slug}/${shoe.releases[0]?.releaseSlug ?? slug}`;
+  const getReleaseIdBySlug = (releaseSlug: string) =>
+    shoe.releases.find((release) => release.releaseSlug === releaseSlug)?.id ?? null;
+  const getReleaseIdByName = (releaseName: string) =>
+    shoe.releases.find((release) => release.release === releaseName)?.id ?? null;
 
   return (
     <main className="page-shell detail-shell">
@@ -115,9 +119,14 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                 <p className="detail-muted">
                   MSRP {release.priceUsd ? `$${release.priceUsd}` : "Pending"} • {release.reviewCount} reviews
                 </p>
-                <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
-                  Open release detail
-                </a>
+                <div className="card-actions">
+                  <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
+                    Open release detail
+                  </a>
+                  <a className="text-link" href={`/compare?release=${release.id}`}>
+                    Compare this release
+                  </a>
+                </div>
               </article>
             ))}
           </div>
@@ -147,9 +156,21 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                 ) : (
                   <p className="detail-muted">No major structured changes detected.</p>
                 )}
-                <a className="text-link" href={`/shoes/${shoe.slug}/${change.releaseSlug}`}>
-                  Open this release
-                </a>
+                <div className="card-actions">
+                  <a className="text-link" href={`/shoes/${shoe.slug}/${change.releaseSlug}`}>
+                    Open this release
+                  </a>
+                  {change.previousRelease &&
+                  getReleaseIdBySlug(change.releaseSlug) &&
+                  getReleaseIdByName(change.previousRelease) ? (
+                    <a
+                      className="text-link"
+                      href={`/compare?release=${getReleaseIdBySlug(change.releaseSlug)}&release=${getReleaseIdByName(change.previousRelease)}`}
+                    >
+                      Compare versions
+                    </a>
+                  ) : null}
+                </div>
               </article>
             ))}
           </div>

@@ -41,7 +41,7 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
         <Link className="text-link" href={`/shoes/${shoe.slug}`}>
           Open shoe detail
         </Link>
-        <Link className="text-link" href={`/compare?shoe=${shoe.slug}`}>
+        <Link className="text-link" href={`/compare?release=${shoe.id}`}>
           Compare this shoe
         </Link>
       </div>

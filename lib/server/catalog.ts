@@ -19,6 +19,7 @@ export interface CatalogCard {
   model: string;
   release: string;
   slug: string;
+  releaseSlug: string;
   category: string;
   rideProfile: string;
   usageSummary: string | null;
@@ -279,6 +280,7 @@ export async function getCatalogCards(filters: CatalogFilters = {}): Promise<Cat
       model: row.model,
       release: row.release,
       slug: row.slug,
+      releaseSlug: slugifyRelease(row.release),
       category: humanizeCategory(row.category),
       terrain: humanizeCategory(row.terrain),
       stability: capitalize(row.stability),
@@ -1017,14 +1019,14 @@ export async function getComparisonPageData(selectedSlugs: string[]): Promise<Co
   };
 }
 
-export async function getComparisonRows(selectedSlugs: string[]): Promise<ComparisonRow[]> {
-  const slugs = selectedSlugs.filter(Boolean).slice(0, 4);
-  if (!slugs.length) {
+export async function getComparisonRows(selectedReleaseIds: string[]): Promise<ComparisonRow[]> {
+  const releaseIds = selectedReleaseIds.filter(Boolean).slice(0, 4);
+  if (!releaseIds.length) {
     return buildFallbackComparison(buildFallbackCatalog().slice(0, 3));
   }
 
   if (!process.env.DATABASE_URL) {
-    return buildFallbackComparison(buildFallbackCatalog().filter((shoe) => slugs.includes(shoe.slug)));
+    return buildFallbackComparison(buildFallbackCatalog().slice(0, Math.min(3, releaseIds.length)));
   }
 
   try {
@@ -1059,7 +1061,7 @@ export async function getComparisonRows(selectedSlugs: string[]): Promise<Compar
         reviews,
         and(eq(reviews.releaseId, shoeReleases.id), eq(reviews.status, "approved"))
       )
-      .where(inArray(shoes.slug, slugs))
+      .where(inArray(shoeReleases.id, releaseIds))
       .groupBy(
         shoeReleases.id,
         brands.name,
@@ -1106,7 +1108,7 @@ export async function getComparisonRows(selectedSlugs: string[]): Promise<Compar
       reviewReconciliation: buildComparisonReconciliationFromMetadata(row.metadata),
     }));
   } catch {
-    return buildFallbackComparison(buildFallbackCatalog().filter((shoe) => slugs.includes(shoe.slug)));
+    return buildFallbackComparison(buildFallbackCatalog().slice(0, Math.min(3, releaseIds.length)));
   }
 }
 
@@ -1129,6 +1131,7 @@ function buildFallbackCatalog(): CatalogCard[] {
     model: shoe.name,
     release: shoe.name,
     slug: `${shoe.brand}-${shoe.name}`.toLowerCase().replaceAll(" ", "-"),
+    releaseSlug: slugifyRelease(shoe.name),
     category: shoe.category,
     terrain: "Road",
     stability: "Neutral",
