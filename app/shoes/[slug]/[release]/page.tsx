@@ -90,6 +90,9 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               </a>
               <span>{release.releaseYear ?? "Pending year"}</span>
               <span>{release.reviewCoverage.status} coverage</span>
+              {release.changeTeaser.length ? (
+                <p className="detail-muted release-teaser">{release.changeTeaser[0]}</p>
+              ) : null}
               <div className="card-actions">
                 <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
                   Open

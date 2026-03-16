@@ -86,6 +86,9 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
               </a>
               <span>{release.releaseYear ?? "Pending year"}</span>
               <span>{release.reviewCoverage.status} coverage</span>
+              {release.changeTeaser.length ? (
+                <p className="detail-muted release-teaser">{release.changeTeaser[0]}</p>
+              ) : null}
               <div className="card-actions">
                 <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
                   Open
@@ -128,6 +131,15 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                 <p className="detail-muted">
                   MSRP {release.priceUsd ? `$${release.priceUsd}` : "Pending"} • {release.reviewCount} reviews
                 </p>
+                {release.changeTeaser.length ? (
+                  <div className="detail-chip-row">
+                    {release.changeTeaser.map((item) => (
+                      <span className="pill" key={item}>
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
                 <div className="card-actions">
                   <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
                     Open release detail

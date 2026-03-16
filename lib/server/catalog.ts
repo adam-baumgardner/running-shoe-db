@@ -161,6 +161,7 @@ export interface ShoeReleaseListItem {
   reviewCount: number;
   averageReviewScore: number | null;
   reviewCoverage: ShoeDetail["reviewCoverage"];
+  changeTeaser: string[];
 }
 
 export interface ReleaseChangeSummary {
@@ -569,6 +570,7 @@ export async function getShoeParentPageData(slug: string): Promise<ShoeParentPag
           reviewCount: fallback.reviewCount,
           averageReviewScore: fallback.averageReviewScore,
           reviewCoverage: fallback.reviewCoverage,
+          changeTeaser: ["Current fallback release."],
         },
       ],
       releaseChanges: [],
@@ -646,6 +648,11 @@ export async function getShoeParentPageData(slug: string): Promise<ShoeParentPag
       return null;
     }
 
+    const releaseChanges = buildReleaseChangeSummaries(rows);
+    const changeMap = new Map(
+      releaseChanges.map((change) => [change.releaseSlug, change.changes.slice(0, 2)]),
+    );
+
     const releases = rows.map((row) => ({
       id: row.id,
       release: row.release,
@@ -656,6 +663,8 @@ export async function getShoeParentPageData(slug: string): Promise<ShoeParentPag
       reviewCount: Number(row.reviewCount),
       averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
       reviewCoverage: assessComparisonRowCoverage(row.metadata, Number(row.reviewCount)),
+      changeTeaser:
+        changeMap.get(slugifyRelease(row.release)) ?? ["No major changes summarized for this release yet."],
     }));
 
     return {
@@ -668,7 +677,7 @@ export async function getShoeParentPageData(slug: string): Promise<ShoeParentPag
       usageSummary: featured.usageSummary,
       featuredRelease: featuredDetail,
       releases,
-      releaseChanges: buildReleaseChangeSummaries(rows),
+      releaseChanges,
     };
   } catch {
     return null;

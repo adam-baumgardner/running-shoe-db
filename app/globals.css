@@ -328,6 +328,12 @@ a {
   font-size: 1rem;
 }
 
+.release-teaser {
+  margin: 0.1rem 0 0.3rem;
+  font-size: 0.94rem;
+  line-height: 1.45;
+}
+
 .release-rail-item--active {
   border-color: rgba(199, 81, 45, 0.45);
   background: rgba(241, 176, 122, 0.18);
