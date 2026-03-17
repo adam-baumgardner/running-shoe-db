@@ -26,7 +26,11 @@ export default async function InternalPage() {
   let errorMessage: string | null = null;
 
   try {
-    data = await getEditorialDashboardData();
+    data = await withTimeout(
+      getEditorialDashboardData(),
+      8000,
+      "Internal dashboard timed out while loading server data.",
+    );
   } catch (error) {
     console.error("Internal dashboard data fetch failed", error);
     errorMessage = error instanceof Error ? error.message : "Unknown internal dashboard error";
@@ -931,6 +935,23 @@ export default async function InternalPage() {
       </section>
     </main>
   );
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
 }
 
 function formatDateTime(value: Date | string | null) {
