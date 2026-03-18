@@ -7,6 +7,7 @@ import {
   generateMissingAiReviewSummariesAction,
   runBelieveInTheRunCrawlAction,
   runDoctorsOfRunningCrawlAction,
+  runCoverageGapCrawlAction,
   runRedditRunningShoeGeeksCrawlAction,
   runRunRepeatCrawlAction,
   runScheduledIngestionAction,
@@ -645,9 +646,24 @@ export default async function InternalPage() {
               </div>
               <div>
                 <p className="detail-muted">
-                  {release.missingSourceNames.length ? release.missingSourceNames.join(", ") : "No active source gaps"}
+                  {release.missingSources.length
+                    ? release.missingSources.map((source) => source.sourceName).join(", ")
+                    : "No active source gaps"}
                 </p>
                 <p className="detail-muted">Pending reviews: {release.pendingCount}</p>
+                {release.missingSources.length ? (
+                  <div className="card-actions card-actions--dense">
+                    {release.missingSources.slice(0, 3).map((source) => (
+                      <form action={runCoverageGapCrawlAction} key={`${release.releaseId}-${source.importerKey}`}>
+                        <input name="releaseId" type="hidden" value={release.releaseId} />
+                        <input name="importerKey" type="hidden" value={source.importerKey} />
+                        <button className="button-secondary" type="submit">
+                          Run {source.sourceName}
+                        </button>
+                      </form>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
           ))}

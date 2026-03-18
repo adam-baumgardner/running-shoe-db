@@ -103,7 +103,11 @@ export interface EditorialDashboardData {
     pendingCount: number;
     uniqueSourceCount: number;
     sourceNames: string[];
-    missingSourceNames: string[];
+    missingSources: Array<{
+      reviewSourceId: string;
+      sourceName: string;
+      importerKey: string;
+    }>;
     coverageStatus: "healthy" | "thin" | "missing-editorial" | "missing-community";
   }>;
   crawlSources: Array<{
@@ -515,10 +519,14 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         pendingCount: entry.pendingCount,
         uniqueSourceCount: entry.approvedSourceIds.size,
         sourceNames: [...entry.approvedSourceNames].sort((left, right) => left.localeCompare(right)),
-        missingSourceNames: configuredCoverageSourceRows
+        missingSources: configuredCoverageSourceRows
           .filter((source) => !entry.approvedSourceIds.has(source.reviewSourceId))
-          .map((source) => source.sourceName)
-          .sort((left, right) => left.localeCompare(right)),
+          .map((source) => ({
+            reviewSourceId: source.reviewSourceId,
+            sourceName: source.sourceName,
+            importerKey: source.importerKey,
+          }))
+          .sort((left, right) => left.sourceName.localeCompare(right.sourceName)),
         coverageStatus: getCoverageStatus(entry),
       }))
       .sort((left, right) => {

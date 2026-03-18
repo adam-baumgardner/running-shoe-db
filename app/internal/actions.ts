@@ -487,6 +487,36 @@ export async function runDoctorsOfRunningCrawlAction(formData: FormData) {
   revalidatePath("/shoes");
 }
 
+export async function runCoverageGapCrawlAction(formData: FormData) {
+  requireDatabase();
+  const releaseId = String(formData.get("releaseId") ?? "").trim();
+  const importerKey = String(formData.get("importerKey") ?? "").trim();
+
+  if (!releaseId || !importerKey) {
+    throw new Error("Release and importer are required.");
+  }
+
+  switch (importerKey) {
+    case "believe-in-the-run":
+      await runBelieveInTheRunImport({ releaseId });
+      break;
+    case "reddit-running-shoe-geeks":
+      await runRedditRunningShoeGeeksImport({ releaseId });
+      break;
+    case "runrepeat":
+      await runRunRepeatImport({ releaseId });
+      break;
+    case "doctors-of-running":
+      await runDoctorsOfRunningImport({ releaseId });
+      break;
+    default:
+      throw new Error(`Unsupported importer key: ${importerKey}`);
+  }
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
 export async function generateAiReviewSummaryAction(formData: FormData) {
   const db = requireDatabase();
   const releaseId = String(formData.get("releaseId") ?? "").trim();
