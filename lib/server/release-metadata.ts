@@ -11,10 +11,13 @@ export interface ReleaseAiReviewSummary {
   overview: string;
   overallSentiment: ReviewSentiment;
   confidence: ReviewConfidence;
+  buyerSignal: string | null;
   pros: string[];
   cons: string[];
   bestFor: string[];
   watchOuts: string[];
+  consensusPoints: string[];
+  debates: string[];
   reviewCount: number;
   sourceCount: number;
   generatedAt: string;
@@ -118,10 +121,13 @@ export function getReleaseAiReviewSummary(metadata: unknown): ReleaseAiReviewSum
     overview: override.overview ?? generated.overview,
     overallSentiment: override.overallSentiment ?? generated.overallSentiment,
     confidence: override.confidence ?? generated.confidence,
+    buyerSignal: generated.buyerSignal,
     pros: override.pros.length ? override.pros : generated.pros,
     cons: override.cons.length ? override.cons : generated.cons,
     bestFor: override.bestFor.length ? override.bestFor : generated.bestFor,
     watchOuts: override.watchOuts.length ? override.watchOuts : generated.watchOuts,
+    consensusPoints: generated.consensusPoints,
+    debates: generated.debates,
     isEditorialOverride: true,
   };
 }
@@ -144,10 +150,13 @@ export function getStoredReleaseAiReviewSummary(metadata: unknown): ReleaseAiRev
     overview,
     overallSentiment,
     confidence,
+    buyerSignal: typeof record.buyerSignal === "string" ? record.buyerSignal : null,
     pros: readStringList(record.pros, 4),
     cons: readStringList(record.cons, 4),
     bestFor: readStringList(record.bestFor, 4),
     watchOuts: readStringList(record.watchOuts, 4),
+    consensusPoints: readStringList(record.consensusPoints, 4),
+    debates: readStringList(record.debates, 4),
     reviewCount: typeof record.reviewCount === "number" ? record.reviewCount : 0,
     sourceCount: typeof record.sourceCount === "number" ? record.sourceCount : 0,
     generatedAt,

@@ -2,7 +2,13 @@ import { and, avg, count, desc, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { shoes as fallbackShoes } from "@/lib/data";
 import { HIGHLIGHT_PATTERNS, normalizeSearchText } from "@/lib/ingestion/review-normalization";
-import { getReleaseAiReviewSummary, getReleaseReconciliationOverrides } from "@/lib/server/release-metadata";
+import {
+  getReleaseAiReviewSummary,
+  getReleaseReconciliationOverrides,
+  type ReleaseAiReviewSummary,
+  type ReviewConfidence,
+  type ReviewSentiment,
+} from "@/lib/server/release-metadata";
 import {
   brands,
   reviewAuthors,
@@ -32,10 +38,33 @@ export interface CatalogCard {
   dropMm: number | null;
   reviewCount: number;
   averageReviewScore: number | null;
+  reviewScore: number | null;
+  reviewIntelligence: ReviewIntelligence;
   terrain: string;
   stability: string;
   isPlated: boolean;
   isCurrent: boolean;
+}
+
+export interface ReviewIntelligence {
+  compositeScore: number | null;
+  ratingScore: number | null;
+  sentimentScore: number | null;
+  editorialScore: number | null;
+  communityScore: number | null;
+  editorialSummary: string | null;
+  communitySummary: string | null;
+  confidence: ReviewConfidence;
+  agreement: "strong" | "mixed" | "split";
+  sourceCount: number;
+  reviewCount: number;
+  evidenceCount: number;
+  summary: string;
+  buyerSignal: string | null;
+  consensusPoints: string[];
+  debates: string[];
+  positives: string[];
+  concerns: string[];
 }
 
 export interface CatalogFilters {
@@ -93,6 +122,11 @@ export interface ReviewsFeedItem {
   publishedAt: string | null;
   authorName: string | null;
   aiOverview: string | null;
+  reviewScore: number | null;
+  reviewConfidence: ReviewConfidence;
+  buyerSignal: string | null;
+  consensusPoints: string[];
+  debates: string[];
 }
 
 export interface ReviewsFeedData {
@@ -143,6 +177,8 @@ export interface ShoeDetail {
   sourceNotes: string | null;
   reviewCount: number;
   averageReviewScore: number | null;
+  reviewScore: number | null;
+  reviewIntelligence: ReviewIntelligence;
   reviewCoverage: {
     status: "strong" | "developing" | "thin" | "stale";
     summary: string;
@@ -187,10 +223,13 @@ export interface ShoeDetail {
     overview: string;
     overallSentiment: "positive" | "mixed" | "negative";
     confidence: "low" | "medium" | "high";
+    buyerSignal: string | null;
     pros: string[];
     cons: string[];
     bestFor: string[];
     watchOuts: string[];
+    consensusPoints: string[];
+    debates: string[];
     reviewCount: number;
     sourceCount: number;
     generatedAt: string;
@@ -216,6 +255,8 @@ export interface ShoeReleaseListItem {
   priceUsd: number | null;
   reviewCount: number;
   averageReviewScore: number | null;
+  reviewScore: number | null;
+  reviewIntelligence: ReviewIntelligence;
   reviewCoverage: ShoeDetail["reviewCoverage"];
   changeTeaser: string[];
 }
@@ -344,9 +385,14 @@ export async function getCatalogCards(filters: CatalogFilters = {}): Promise<Cat
       )
       .orderBy(desc(shoeReleases.releaseYear), brands.name, shoes.name);
 
-    const parsedRows: CatalogCard[] = rows.map((row) => ({
-      id: row.id,
-      brand: row.brand,
+    const parsedRows: CatalogCard[] = rows.map((row) => {
+      const reviewCount = Number(row.reviewCount);
+      const averageReviewScore = row.averageReviewScore ? Number(row.averageReviewScore) : null;
+      const reviewIntelligence = buildAggregateReviewIntelligence(reviewCount, averageReviewScore, null);
+
+      return {
+        id: row.id,
+        brand: row.brand,
         model: row.model,
         release: row.release,
         slug: row.slug,
@@ -363,11 +409,14 @@ export async function getCatalogCards(filters: CatalogFilters = {}): Promise<Cat
         heelStackMm: row.heelStackMm,
         forefootStackMm: row.forefootStackMm,
         dropMm: row.dropMm,
-        reviewCount: Number(row.reviewCount),
-        averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
+        reviewCount,
+        averageReviewScore,
+        reviewScore: reviewIntelligence.compositeScore,
+        reviewIntelligence,
         isPlated: row.isPlated,
         isCurrent: row.isCurrent,
-      }));
+      };
+    });
 
     return sortCatalog(filterCatalog(parsedRows, filters), filters);
   } catch {
@@ -484,6 +533,14 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       authorName: review.authorName,
     }));
 
+    const averageReviewScore = row.averageReviewScore ? Number(row.averageReviewScore) : null;
+    const aiReviewSummary = getReleaseAiReviewSummary(row.metadata);
+    const reviewIntelligence = buildReviewIntelligence(
+      mappedReviews,
+      averageReviewScore,
+      aiReviewSummary,
+    );
+
     return {
       id: row.id,
       brand: row.brand,
@@ -508,11 +565,13 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       fitNotes: row.fitNotes,
       sourceNotes: row.sourceNotes,
       reviewCount: Number(row.reviewCount),
-      averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
+      averageReviewScore,
+      reviewScore: reviewIntelligence.compositeScore,
+      reviewIntelligence,
       reviewCoverage: assessReviewCoverage(mappedReviews),
       reviewSignalSummary: aggregateReviewSignals(mappedReviews),
       reviewReconciliation: reconcileReviewEvidence(mappedReviews, row.metadata),
-      aiReviewSummary: getReleaseAiReviewSummary(row.metadata),
+      aiReviewSummary,
       reviews: mappedReviews,
     };
   } catch {
@@ -645,6 +704,8 @@ export async function getShoeParentPageData(slug: string): Promise<ShoeParentPag
           priceUsd: fallback.priceUsd,
           reviewCount: fallback.reviewCount,
           averageReviewScore: fallback.averageReviewScore,
+          reviewScore: fallback.reviewScore,
+          reviewIntelligence: fallback.reviewIntelligence,
           reviewCoverage: fallback.reviewCoverage,
           changeTeaser: ["Current fallback release."],
         },
@@ -729,19 +790,31 @@ export async function getShoeParentPageData(slug: string): Promise<ShoeParentPag
       releaseChanges.map((change) => [change.releaseSlug, change.changes.slice(0, 2)]),
     );
 
-    const releases = rows.map((row) => ({
-      id: row.id,
-      release: row.release,
-      releaseSlug: slugifyRelease(row.release),
-      releaseYear: row.releaseYear,
-      isCurrent: row.isCurrent,
-      priceUsd: row.priceUsd ? Number(row.priceUsd) : null,
-      reviewCount: Number(row.reviewCount),
-      averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
-      reviewCoverage: assessComparisonRowCoverage(row.metadata, Number(row.reviewCount)),
-      changeTeaser:
-        changeMap.get(slugifyRelease(row.release)) ?? ["No major changes summarized for this release yet."],
-    }));
+    const releases = rows.map((row) => {
+      const reviewCount = Number(row.reviewCount);
+      const averageReviewScore = row.averageReviewScore ? Number(row.averageReviewScore) : null;
+      const reviewIntelligence = buildAggregateReviewIntelligence(
+        reviewCount,
+        averageReviewScore,
+        getReleaseAiReviewSummary(row.metadata),
+      );
+
+      return {
+        id: row.id,
+        release: row.release,
+        releaseSlug: slugifyRelease(row.release),
+        releaseYear: row.releaseYear,
+        isCurrent: row.isCurrent,
+        priceUsd: row.priceUsd ? Number(row.priceUsd) : null,
+        reviewCount,
+        averageReviewScore,
+        reviewScore: reviewIntelligence.compositeScore,
+        reviewIntelligence,
+        reviewCoverage: assessComparisonRowCoverage(row.metadata, reviewCount),
+        changeTeaser:
+          changeMap.get(slugifyRelease(row.release)) ?? ["No major changes summarized for this release yet."],
+      };
+    });
 
     return {
       brand: featured.brand,
@@ -1172,33 +1245,42 @@ export async function getComparisonRows(selectedReleaseIds: string[]): Promise<C
       )
       .orderBy(brands.name, shoes.name);
 
-    return rows.map((row) => ({
-      id: row.id,
-      brand: row.brand,
-      model: row.model,
-      release: row.release,
-      slug: row.slug,
-      releaseSlug: slugifyRelease(row.release),
-      releaseYear: row.releaseYear,
-      category: humanizeCategory(row.category),
-      terrain: humanizeCategory(row.terrain),
-      stability: capitalize(row.stability),
-      foam: row.foam,
-      rideProfile: buildRideProfile(row.foam, row.isPlated),
-      usageSummary: row.usageSummary,
-      weightOz: row.weightOzMen ? Number(row.weightOzMen) : null,
-      heelStackMm: row.heelStackMm,
-      forefootStackMm: row.forefootStackMm,
-      dropMm: row.dropMm,
-      reviewCount: Number(row.reviewCount),
-      isPlated: row.isPlated,
-      isCurrent: row.isCurrent,
-      priceUsd: row.priceUsd ? Number(row.priceUsd) : null,
-      averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
-      reviewCoverage: assessComparisonRowCoverage(row.metadata, Number(row.reviewCount)),
-      aiReviewSummary: getReleaseAiReviewSummary(row.metadata),
-      reviewReconciliation: buildComparisonReconciliationFromMetadata(row.metadata),
-    }));
+    return rows.map((row) => {
+      const reviewCount = Number(row.reviewCount);
+      const averageReviewScore = row.averageReviewScore ? Number(row.averageReviewScore) : null;
+      const aiReviewSummary = getReleaseAiReviewSummary(row.metadata);
+      const reviewIntelligence = buildAggregateReviewIntelligence(reviewCount, averageReviewScore, aiReviewSummary);
+
+      return {
+        id: row.id,
+        brand: row.brand,
+        model: row.model,
+        release: row.release,
+        slug: row.slug,
+        releaseSlug: slugifyRelease(row.release),
+        releaseYear: row.releaseYear,
+        category: humanizeCategory(row.category),
+        terrain: humanizeCategory(row.terrain),
+        stability: capitalize(row.stability),
+        foam: row.foam,
+        rideProfile: buildRideProfile(row.foam, row.isPlated),
+        usageSummary: row.usageSummary,
+        weightOz: row.weightOzMen ? Number(row.weightOzMen) : null,
+        heelStackMm: row.heelStackMm,
+        forefootStackMm: row.forefootStackMm,
+        dropMm: row.dropMm,
+        reviewCount,
+        isPlated: row.isPlated,
+        isCurrent: row.isCurrent,
+        priceUsd: row.priceUsd ? Number(row.priceUsd) : null,
+        averageReviewScore,
+        reviewScore: reviewIntelligence.compositeScore,
+        reviewIntelligence,
+        reviewCoverage: assessComparisonRowCoverage(row.metadata, reviewCount),
+        aiReviewSummary,
+        reviewReconciliation: buildComparisonReconciliationFromMetadata(row.metadata),
+      };
+    });
   } catch {
     return buildFallbackComparison(buildFallbackCatalog().slice(0, Math.min(3, releaseIds.length)));
   }
@@ -1247,6 +1329,11 @@ export async function getReviewsFeedData(): Promise<ReviewsFeedData> {
       .orderBy(desc(reviews.publishedAt), desc(reviews.createdAt));
 
     const items = rows.map((row) => ({
+      reviewIntelligence: buildAggregateReviewIntelligence(
+        row.scoreNormalized100 !== null || row.sentiment ? 1 : 0,
+        row.scoreNormalized100 !== null ? Number(row.scoreNormalized100) : null,
+        getReleaseAiReviewSummary(row.metadata),
+      ),
       id: row.id,
       brand: row.brand,
       model: row.model,
@@ -1264,6 +1351,13 @@ export async function getReviewsFeedData(): Promise<ReviewsFeedData> {
       publishedAt: row.publishedAt ? row.publishedAt.toISOString().slice(0, 10) : null,
       authorName: row.authorName,
       aiOverview: getReleaseAiReviewSummary(row.metadata)?.overview ?? null,
+    })).map(({ reviewIntelligence, ...item }) => ({
+      ...item,
+      reviewScore: reviewIntelligence.compositeScore,
+      reviewConfidence: reviewIntelligence.confidence,
+      buyerSignal: reviewIntelligence.buyerSignal,
+      consensusPoints: reviewIntelligence.consensusPoints,
+      debates: reviewIntelligence.debates,
     }));
 
     return {
@@ -1299,35 +1393,43 @@ function buildRideProfile(foam: string | null, isPlated: boolean) {
 }
 
 function buildFallbackCatalog(): CatalogCard[] {
-  return fallbackShoes.map((shoe, index) => ({
-    id: `fallback-${index}`,
-    brand: shoe.brand,
-    model: shoe.name,
-    release: shoe.name,
-    slug: `${shoe.brand}-${shoe.name}`.toLowerCase().replaceAll(" ", "-"),
-    releaseSlug: slugifyRelease(shoe.name),
-    releaseYear: 2024,
-    category: shoe.category,
-    foam: "Responsive foam",
-    terrain: "Road",
-    stability: "Neutral",
-    rideProfile: shoe.rideProfile,
-    usageSummary: shoe.category,
-    priceUsd: index === 1 ? 170 : 140,
-    weightOz: shoe.weightOz,
-    heelStackMm: shoe.dropMm ? shoe.dropMm + 28 : null,
-    forefootStackMm: 28,
-    dropMm: shoe.dropMm,
-    reviewCount: 1,
-    averageReviewScore: 80 + index * 5,
-    isPlated: false,
-    isCurrent: true,
-  }));
+  return fallbackShoes.map((shoe, index) => {
+    const averageReviewScore = 80 + index * 5;
+    const reviewIntelligence = buildAggregateReviewIntelligence(1, averageReviewScore, null);
+
+    return {
+      id: `fallback-${index}`,
+      brand: shoe.brand,
+      model: shoe.name,
+      release: shoe.name,
+      slug: `${shoe.brand}-${shoe.name}`.toLowerCase().replaceAll(" ", "-"),
+      releaseSlug: slugifyRelease(shoe.name),
+      releaseYear: 2024,
+      category: shoe.category,
+      foam: "Responsive foam",
+      terrain: "Road",
+      stability: "Neutral",
+      rideProfile: shoe.rideProfile,
+      usageSummary: shoe.category,
+      priceUsd: index === 1 ? 170 : 140,
+      weightOz: shoe.weightOz,
+      heelStackMm: shoe.dropMm ? shoe.dropMm + 28 : null,
+      forefootStackMm: 28,
+      dropMm: shoe.dropMm,
+      reviewCount: 1,
+      averageReviewScore,
+      reviewScore: reviewIntelligence.compositeScore,
+      reviewIntelligence,
+      isPlated: false,
+      isCurrent: true,
+    };
+  });
 }
 
 function buildFallbackDetail(slug: string): ShoeDetail | null {
   const match = buildFallbackCatalog().find((shoe) => shoe.slug === slug);
   if (!match) return null;
+  const reviewIntelligence = buildAggregateReviewIntelligence(match.reviewCount, 82, null);
 
   return {
     id: match.id,
@@ -1354,6 +1456,8 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
     sourceNotes: "Fallback data from the design seed set.",
     reviewCount: match.reviewCount,
     averageReviewScore: 82,
+    reviewScore: reviewIntelligence.compositeScore,
+    reviewIntelligence,
     reviewCoverage: {
       status: "developing",
       summary: "Fallback review coverage signal only.",
@@ -1422,28 +1526,35 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
 
 function buildFallbackComparison(shoes: CatalogCard[]): ComparisonRow[] {
   const source = shoes.length ? shoes : buildFallbackCatalog().slice(0, 3);
-  return source.map((shoe, index) => ({
-    ...shoe,
-    releaseSlug: slugifyRelease(shoe.release),
-    priceUsd: index === 1 ? 170 : 140,
-    heelStackMm: shoe.dropMm ? shoe.dropMm + 28 : null,
-    forefootStackMm: 28,
-    averageReviewScore: 80 + index * 5,
-    reviewCoverage: {
-      status: "developing",
-      summary: "Fallback review coverage signal only.",
-      sourceCount: 1,
-      reviewCount: shoe.reviewCount,
-      freshestReviewDate: "2024-01-01",
-    },
-    aiReviewSummary: null,
-    reviewReconciliation: {
-      summaryNote: null,
-      topTakeaways: [],
-      contradictionCount: 0,
-      themes: [],
-    },
-  }));
+  return source.map((shoe, index) => {
+    const averageReviewScore = 80 + index * 5;
+    const reviewIntelligence = buildAggregateReviewIntelligence(shoe.reviewCount, averageReviewScore, null);
+
+    return {
+      ...shoe,
+      releaseSlug: slugifyRelease(shoe.release),
+      priceUsd: index === 1 ? 170 : 140,
+      heelStackMm: shoe.dropMm ? shoe.dropMm + 28 : null,
+      forefootStackMm: 28,
+      averageReviewScore,
+      reviewScore: reviewIntelligence.compositeScore,
+      reviewIntelligence,
+      reviewCoverage: {
+        status: "developing",
+        summary: "Fallback review coverage signal only.",
+        sourceCount: 1,
+        reviewCount: shoe.reviewCount,
+        freshestReviewDate: "2024-01-01",
+      },
+      aiReviewSummary: null,
+      reviewReconciliation: {
+        summaryNote: null,
+        topTakeaways: [],
+        contradictionCount: 0,
+        themes: [],
+      },
+    };
+  });
 }
 
 function buildShoeDetailFromRow(
@@ -1502,6 +1613,9 @@ function buildShoeDetailFromRow(
     sourceUrl: review.sourceUrl,
     authorName: review.authorName,
   }));
+  const averageReviewScore = row.averageReviewScore ? Number(row.averageReviewScore) : null;
+  const aiReviewSummary = getReleaseAiReviewSummary(row.metadata);
+  const reviewIntelligence = buildReviewIntelligence(mappedReviews, averageReviewScore, aiReviewSummary);
 
   return {
     id: row.id,
@@ -1527,11 +1641,13 @@ function buildShoeDetailFromRow(
     fitNotes: row.fitNotes,
     sourceNotes: row.sourceNotes,
     reviewCount: Number(row.reviewCount),
-    averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
+    averageReviewScore,
+    reviewScore: reviewIntelligence.compositeScore,
+    reviewIntelligence,
     reviewCoverage: assessReviewCoverage(mappedReviews),
     reviewSignalSummary: aggregateReviewSignals(mappedReviews),
     reviewReconciliation: reconcileReviewEvidence(mappedReviews, row.metadata),
-    aiReviewSummary: getReleaseAiReviewSummary(row.metadata),
+    aiReviewSummary,
     reviews: mappedReviews,
   };
 }
@@ -1716,8 +1832,8 @@ function buildComparisonOverview(rows: ComparisonRow[]) {
     .filter((row) => row.weightOz !== null)
     .sort((left, right) => (left.weightOz ?? 99) - (right.weightOz ?? 99))[0];
   const maxScore = [...rows]
-    .filter((row) => row.averageReviewScore !== null)
-    .sort((left, right) => (right.averageReviewScore ?? 0) - (left.averageReviewScore ?? 0))[0];
+    .filter((row) => row.reviewScore !== null)
+    .sort((left, right) => (right.reviewScore ?? 0) - (left.reviewScore ?? 0))[0];
 
   const clauses = [`${names.join(", ")} serve different buying priorities.`];
   if (lightest) {
@@ -1728,6 +1844,226 @@ function buildComparisonOverview(rows: ComparisonRow[]) {
   }
 
   return clauses.join(" ");
+}
+
+function buildReviewIntelligence(
+  reviews: ShoeDetail["reviews"],
+  averageReviewScore: number | null,
+  aiReviewSummary: ReleaseAiReviewSummary | null,
+): ReviewIntelligence {
+  const reviewCount = reviews.length;
+  const sourceCount = new Set(reviews.map((review) => `${review.sourceType}:${review.sourceName}`)).size;
+  const evidenceCount = aiReviewSummary?.evidence.length ?? Math.min(reviewCount, 6);
+  const ratingScore = weightedAverage(
+    reviews
+      .filter((review) => review.scoreNormalized100 !== null)
+      .map((review) => ({
+        value: review.scoreNormalized100 as number,
+        weight: getSourceWeight(review.sourceType),
+      })),
+  ) ?? averageReviewScore;
+  const editorialScore = weightedAverage(
+    reviews
+      .filter((review) => review.sourceType === "editorial" && review.scoreNormalized100 !== null)
+      .map((review) => ({
+        value: review.scoreNormalized100 as number,
+        weight: getSourceWeight(review.sourceType),
+      })),
+  );
+  const communityScore = weightedAverage(
+    reviews
+      .filter((review) => review.sourceType !== "editorial")
+      .map((review) => ({
+        value:
+          review.scoreNormalized100 ??
+          sentimentToScore(review.sentiment ?? aiReviewSummary?.overallSentiment ?? "mixed"),
+        weight: getSourceWeight(review.sourceType),
+      })),
+  );
+  const sentimentScore = weightedAverage(
+    reviews.map((review) => ({
+      value: sentimentToScore(review.sentiment ?? aiReviewSummary?.overallSentiment ?? "mixed"),
+      weight: getSourceWeight(review.sourceType),
+    })),
+  ) ?? (aiReviewSummary ? aiSummarySentimentScore(aiReviewSummary) : null);
+  const confidence = deriveConfidence(
+    reviewCount,
+    sourceCount,
+    aiReviewSummary?.confidence ?? null,
+    reviews.map((review) => review.sentiment),
+  );
+  const agreement = deriveAgreement(reviews.map((review) => review.sentiment));
+  const compositeScore = weightedAverage(
+    [
+      ratingScore !== null ? { value: ratingScore, weight: 0.55 } : null,
+      sentimentScore !== null ? { value: sentimentScore, weight: 0.45 } : null,
+    ].filter((entry): entry is { value: number; weight: number } => Boolean(entry)),
+  );
+
+  return {
+    compositeScore: compositeScore === null ? null : Math.round(compositeScore),
+    ratingScore: ratingScore === null ? null : Math.round(ratingScore),
+    sentimentScore: sentimentScore === null ? null : Math.round(sentimentScore),
+    editorialScore: editorialScore === null ? null : Math.round(editorialScore),
+    communityScore: communityScore === null ? null : Math.round(communityScore),
+    editorialSummary: buildChannelSummary("Editorial", editorialScore),
+    communitySummary: buildChannelSummary("Community", communityScore),
+    confidence,
+    agreement,
+    sourceCount,
+    reviewCount,
+    evidenceCount,
+    summary: buildReviewIntelligenceSummary(
+      compositeScore === null ? null : Math.round(compositeScore),
+      confidence,
+      agreement,
+      sourceCount,
+      reviewCount,
+    ),
+    buyerSignal: aiReviewSummary?.buyerSignal ?? null,
+    consensusPoints: aiReviewSummary?.consensusPoints.slice(0, 3) ?? [],
+    debates: aiReviewSummary?.debates.slice(0, 3) ?? [],
+    positives: aiReviewSummary?.pros.slice(0, 2) ?? [],
+    concerns: aiReviewSummary?.cons.slice(0, 2) ?? [],
+  };
+}
+
+function buildAggregateReviewIntelligence(
+  reviewCount: number,
+  averageReviewScore: number | null,
+  aiReviewSummary: ReleaseAiReviewSummary | null,
+): ReviewIntelligence {
+  const sourceCount = aiReviewSummary?.sourceCount ?? 0;
+  const evidenceCount = aiReviewSummary?.evidence.length ?? 0;
+  const sentimentScore = aiReviewSummary ? aiSummarySentimentScore(aiReviewSummary) : null;
+  const confidence = deriveConfidence(reviewCount, sourceCount, aiReviewSummary?.confidence ?? null, []);
+  const agreement = aiReviewSummary?.overallSentiment === "mixed" ? "mixed" : confidence === "high" ? "strong" : "mixed";
+  const compositeScore = weightedAverage(
+    [
+      averageReviewScore !== null ? { value: averageReviewScore, weight: 0.55 } : null,
+      sentimentScore !== null ? { value: sentimentScore, weight: 0.45 } : null,
+    ].filter((entry): entry is { value: number; weight: number } => Boolean(entry)),
+  );
+
+  return {
+    compositeScore: compositeScore === null ? null : Math.round(compositeScore),
+    ratingScore: averageReviewScore === null ? null : Math.round(averageReviewScore),
+    sentimentScore: sentimentScore === null ? null : Math.round(sentimentScore),
+    editorialScore: null,
+    communityScore: null,
+    editorialSummary: null,
+    communitySummary: null,
+    confidence,
+    agreement,
+    sourceCount,
+    reviewCount,
+    evidenceCount,
+    summary: buildReviewIntelligenceSummary(
+      compositeScore === null ? null : Math.round(compositeScore),
+      confidence,
+      agreement,
+      sourceCount,
+      reviewCount,
+    ),
+    buyerSignal: aiReviewSummary?.buyerSignal ?? null,
+    consensusPoints: aiReviewSummary?.consensusPoints.slice(0, 3) ?? [],
+    debates: aiReviewSummary?.debates.slice(0, 3) ?? [],
+    positives: aiReviewSummary?.pros.slice(0, 2) ?? [],
+    concerns: aiReviewSummary?.cons.slice(0, 2) ?? [],
+  };
+}
+
+function buildReviewIntelligenceSummary(
+  compositeScore: number | null,
+  confidence: ReviewConfidence,
+  agreement: ReviewIntelligence["agreement"],
+  sourceCount: number,
+  reviewCount: number,
+) {
+  if (compositeScore === null) {
+    return "Review signal is still forming for this shoe.";
+  }
+
+  const tone =
+    compositeScore >= 88 ? "Very strong" : compositeScore >= 80 ? "Strong" : compositeScore >= 70 ? "Mixed-positive" : "Mixed";
+
+  return `${tone} review signal with ${confidence} confidence across ${sourceCount || reviewCount} indexed sources and ${reviewCount} approved reviews. Agreement is ${agreement}.`;
+}
+
+function buildChannelSummary(channel: "Editorial" | "Community", score: number | null) {
+  if (score === null) {
+    return null;
+  }
+
+  const tone =
+    score >= 88 ? "very positive"
+    : score >= 80 ? "positive"
+    : score >= 72 ? "mixed-positive"
+    : score >= 64 ? "mixed"
+    : "cautious";
+
+  return `${channel} sentiment reads ${tone}.`;
+}
+
+function deriveConfidence(
+  reviewCount: number,
+  sourceCount: number,
+  aiConfidence: ReviewConfidence | null,
+  sentiments: Array<ReviewSentiment | null>,
+): ReviewConfidence {
+  let score = 0;
+  if (reviewCount >= 5) score += 2;
+  else if (reviewCount >= 3) score += 1;
+  if (sourceCount >= 3) score += 2;
+  else if (sourceCount >= 2) score += 1;
+  if (aiConfidence === "high") score += 1;
+  if (aiConfidence === "low") score -= 1;
+  if (deriveAgreement(sentiments) === "split") score -= 1;
+
+  if (score >= 4) return "high";
+  if (score >= 2) return "medium";
+  return "low";
+}
+
+function deriveAgreement(sentiments: Array<ReviewSentiment | null>): ReviewIntelligence["agreement"] {
+  const positives = sentiments.filter((value) => value === "positive").length;
+  const negatives = sentiments.filter((value) => value === "negative").length;
+  const mixed = sentiments.filter((value) => value === "mixed").length;
+  const total = positives + negatives + mixed;
+
+  if (!total) return "mixed";
+  if (positives > 0 && negatives > 0 && Math.abs(positives - negatives) <= 1) return "split";
+  if (mixed >= total / 2) return "mixed";
+  return "strong";
+}
+
+function aiSummarySentimentScore(summary: ReleaseAiReviewSummary) {
+  const base = sentimentToScore(summary.overallSentiment);
+  if (summary.confidence === "high") return base + 3;
+  if (summary.confidence === "low") return base - 3;
+  return base;
+}
+
+function sentimentToScore(sentiment: ReviewSentiment) {
+  if (sentiment === "positive") return 86;
+  if (sentiment === "negative") return 48;
+  return 69;
+}
+
+function getSourceWeight(sourceType: "editorial" | "reddit" | "user") {
+  if (sourceType === "editorial") return 1;
+  if (sourceType === "user") return 0.8;
+  return 0.7;
+}
+
+function weightedAverage(values: Array<{ value: number; weight: number }>) {
+  if (!values.length) {
+    return null;
+  }
+
+  const weightedSum = values.reduce((sum, entry) => sum + entry.value * entry.weight, 0);
+  const totalWeight = values.reduce((sum, entry) => sum + entry.weight, 0);
+  return totalWeight ? weightedSum / totalWeight : null;
 }
 
 function buildChooserGuidance(row: ComparisonRow) {
@@ -1957,7 +2293,7 @@ function filterCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
     if (!matchesMinMax(shoe.dropMm, filters.minDrop, filters.maxDrop)) return false;
 
     const minReviewScore = parseNumber(filters.minReviewScore);
-    if (minReviewScore !== null && (shoe.averageReviewScore ?? -1) < minReviewScore) return false;
+    if (minReviewScore !== null && (shoe.reviewScore ?? -1) < minReviewScore) return false;
 
     const minReviewCount = parseNumber(filters.minReviewCount);
     if (minReviewCount !== null && shoe.reviewCount < minReviewCount) return false;
@@ -2004,7 +2340,7 @@ function sortCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
         delta = compareNullableNumber(left.dropMm, right.dropMm);
         break;
       case "review-score":
-        delta = compareNullableNumber(left.averageReviewScore, right.averageReviewScore);
+        delta = compareNullableNumber(left.reviewScore, right.reviewScore);
         break;
       case "review-count":
         delta = left.reviewCount - right.reviewCount;

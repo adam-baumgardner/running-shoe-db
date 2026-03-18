@@ -55,13 +55,43 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     },
     {
       label: "Review score",
+      values: selectedRows.map((shoe) => (shoe.reviewScore ? `${shoe.reviewScore}/100` : "Pending")),
+    },
+    {
+      label: "Rating signal",
       values: selectedRows.map((shoe) =>
-        shoe.averageReviewScore ? `${Math.round(shoe.averageReviewScore)}/100` : "Pending",
+        shoe.reviewIntelligence.ratingScore ? `${shoe.reviewIntelligence.ratingScore}/100` : "Pending",
       ),
+    },
+    {
+      label: "Sentiment signal",
+      values: selectedRows.map((shoe) =>
+        shoe.reviewIntelligence.sentimentScore ? `${shoe.reviewIntelligence.sentimentScore}/100` : "Pending",
+      ),
+    },
+    {
+      label: "Score confidence",
+      values: selectedRows.map((shoe) => shoe.reviewIntelligence.confidence),
+    },
+    {
+      label: "Editorial read",
+      values: selectedRows.map((shoe) => shoe.reviewIntelligence.editorialSummary ?? "Pending"),
+    },
+    {
+      label: "Community read",
+      values: selectedRows.map((shoe) => shoe.reviewIntelligence.communitySummary ?? "Pending"),
     },
     {
       label: "Coverage",
       values: selectedRows.map((shoe) => shoe.reviewCoverage.summary),
+    },
+    {
+      label: "Review read",
+      values: selectedRows.map((shoe) => shoe.reviewIntelligence.summary),
+    },
+    {
+      label: "Buyer signal",
+      values: selectedRows.map((shoe) => shoe.reviewIntelligence.buyerSignal ?? "Pending"),
     },
     {
       label: "AI summary",

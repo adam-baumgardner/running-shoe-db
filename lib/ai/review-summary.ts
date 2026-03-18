@@ -6,11 +6,17 @@ const aiSummarySchema = z.object({
   overview: z.string().min(1).max(500),
   overallSentiment: z.enum(["positive", "mixed", "negative"]),
   confidence: z.enum(["low", "medium", "high"]),
+  buyerSignal: z.string().min(1).max(220).nullable(),
   pros: z.array(z.string().min(1).max(120)).max(4),
   cons: z.array(z.string().min(1).max(120)).max(4),
   bestFor: z.array(z.string().min(1).max(120)).max(4),
   watchOuts: z.array(z.string().min(1).max(120)).max(4),
+  consensusPoints: z.array(z.string().min(1).max(140)).max(4),
+  debates: z.array(z.string().min(1).max(140)).max(4),
 });
+
+const NEGATIVE_BIASED_TERMS = new Set(["Value", "Fit"]);
+const MIXED_SIGNAL_TERMS = new Set(["Fit", "Ride", "Value", "Stability"]);
 
 interface ReviewSummaryInput {
   id?: string | null;
@@ -77,7 +83,7 @@ async function generateWithOpenAi(
             {
               type: "input_text",
               text:
-                "You summarize running shoe reviews. Use only the supplied evidence. Produce concise, factual product guidance. Do not invent specs or opinions.",
+                "You summarize running shoe reviews and community discussion. Use only the supplied evidence. Produce concise, factual buyer guidance. Distinguish broad consensus from contested points. Do not invent specs or opinions.",
             },
           ],
         },
@@ -121,6 +127,7 @@ async function generateWithOpenAi(
               overview: { type: "string" },
               overallSentiment: { type: "string", enum: ["positive", "mixed", "negative"] },
               confidence: { type: "string", enum: ["low", "medium", "high"] },
+              buyerSignal: { type: ["string", "null"] },
               pros: {
                 type: "array",
                 items: { type: "string" },
@@ -141,15 +148,28 @@ async function generateWithOpenAi(
                 items: { type: "string" },
                 maxItems: 4,
               },
+              consensusPoints: {
+                type: "array",
+                items: { type: "string" },
+                maxItems: 4,
+              },
+              debates: {
+                type: "array",
+                items: { type: "string" },
+                maxItems: 4,
+              },
             },
             required: [
               "overview",
               "overallSentiment",
               "confidence",
+              "buyerSignal",
               "pros",
               "cons",
               "bestFor",
               "watchOuts",
+              "consensusPoints",
+              "debates",
             ],
           },
         },
@@ -226,10 +246,13 @@ function buildHeuristicSummary(input: GenerateReleaseReviewSummaryInput & { revi
     overview: buildOverview(input, overallSentiment, confidence, pros, cons),
     overallSentiment,
     confidence,
+    buyerSignal: buildBuyerSignal(input, overallSentiment, confidence),
     pros: withFallback(pros, overallSentiment === "negative" ? [] : ["Promising overall ride signal across current sources."]),
     cons: withFallback(cons, overallSentiment === "positive" ? ["Tradeoffs are still limited in the current review set."] : ["Mixed feedback across the current review set."]),
     bestFor,
     watchOuts,
+    consensusPoints: buildConsensusPoints(sortedTerms.map(([term]) => term), overallSentiment),
+    debates: buildDebates(sortedTerms.map(([term]) => term), overallSentiment),
     reviewCount: input.reviews.length,
     sourceCount: new Set(input.reviews.map((review) => `${review.sourceType}:${review.sourceName}`)).size,
     generatedAt: new Date().toISOString(),
@@ -363,6 +386,39 @@ function buildOverview(
   const pro = pros[0] ? ` ${pros[0]}` : "";
   const con = cons[0] ? ` Main caution: ${cons[0].replace(/\.$/, "")}.` : "";
   return `${lead} Confidence is ${confidence}.${pro}${con}`.trim();
+}
+
+function buildBuyerSignal(
+  input: GenerateReleaseReviewSummaryInput,
+  overallSentiment: ReviewSentiment,
+  confidence: ReviewConfidence,
+) {
+  const tone =
+    overallSentiment === "positive"
+      ? "Broadly positive"
+      : overallSentiment === "negative"
+        ? "Cautious"
+        : "Mixed";
+
+  return `${tone} buyer signal for ${input.category.toLowerCase()} use with ${confidence} confidence.`;
+}
+
+function buildConsensusPoints(terms: string[], overallSentiment: ReviewSentiment) {
+  const consensus = terms
+    .filter((term) => !NEGATIVE_BIASED_TERMS.has(term))
+    .slice(0, 3)
+    .map((term) => buildProsConsSentence(term, overallSentiment === "negative" ? "negative" : "positive"));
+
+  return withFallback(consensus, ["Consensus is still forming across the current sources."]);
+}
+
+function buildDebates(terms: string[], overallSentiment: ReviewSentiment) {
+  const debates = terms
+    .filter((term) => MIXED_SIGNAL_TERMS.has(term) || (overallSentiment === "mixed" && NEGATIVE_BIASED_TERMS.has(term)))
+    .slice(0, 3)
+    .map((term) => `Some reviews diverge on ${term.toLowerCase()}.`);
+
+  return withFallback(debates, overallSentiment === "mixed" ? ["Sources disagree on a few buying tradeoffs."] : []);
 }
 
 function truncateText(value: string | null, limit: number) {

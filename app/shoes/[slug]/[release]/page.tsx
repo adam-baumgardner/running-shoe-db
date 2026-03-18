@@ -60,7 +60,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           </div>
         </div>
         <p>{shoe.aiReviewSummary?.overview ?? shoe.reviewCoverage.summary}</p>
-        <dl className="spec-grid spec-grid--wide">
+          <dl className="spec-grid spec-grid--wide">
           <div>
             <dt>Release year</dt>
             <dd>{shoe.releaseYear ?? "Pending"}</dd>
@@ -91,7 +91,19 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           </div>
           <div>
             <dt>Review score</dt>
-            <dd>{shoe.averageReviewScore ? `${Math.round(shoe.averageReviewScore)}/100` : "Pending"}</dd>
+            <dd>{shoe.reviewScore ? `${shoe.reviewScore}/100` : "Pending"}</dd>
+          </div>
+          <div>
+            <dt>Rating signal</dt>
+            <dd>{shoe.reviewIntelligence.ratingScore ? `${shoe.reviewIntelligence.ratingScore}/100` : "Pending"}</dd>
+          </div>
+          <div>
+            <dt>Sentiment signal</dt>
+            <dd>{shoe.reviewIntelligence.sentimentScore ? `${shoe.reviewIntelligence.sentimentScore}/100` : "Pending"}</dd>
+          </div>
+          <div>
+            <dt>Score confidence</dt>
+            <dd>{shoe.reviewIntelligence.confidence}</dd>
           </div>
         </dl>
       </section>
@@ -101,6 +113,10 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           <p className="feature-kicker">AI And Review Summary</p>
           <h2>What reviewers are saying</h2>
           <p>{shoe.reviewCoverage.summary}</p>
+          <p className="detail-muted">{shoe.reviewIntelligence.summary}</p>
+          {shoe.reviewIntelligence.buyerSignal ? (
+            <p className="catalog-copy">{shoe.reviewIntelligence.buyerSignal}</p>
+          ) : null}
           <div className="detail-chip-row">
             <span className="pill">{shoe.reviewCoverage.sourceCount} sources</span>
             <span className="pill">{shoe.reviewCoverage.reviewCount} reviews</span>
@@ -127,6 +143,44 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                 <dd>{shoe.aiReviewSummary.watchOuts.join(" ") || "Pending"}</dd>
               </div>
             </dl>
+          ) : null}
+          {shoe.reviewIntelligence.positives.length || shoe.reviewIntelligence.concerns.length ? (
+            <dl className="spec-grid">
+              <div>
+                <dt>Most common praise</dt>
+                <dd>{shoe.reviewIntelligence.positives.join(" ") || "Pending"}</dd>
+              </div>
+              <div>
+                <dt>Most common complaints</dt>
+                <dd>{shoe.reviewIntelligence.concerns.join(" ") || "Pending"}</dd>
+              </div>
+              <div>
+                <dt>Editorial read</dt>
+                <dd>{shoe.reviewIntelligence.editorialSummary ?? "Pending"}</dd>
+              </div>
+              <div>
+                <dt>Community read</dt>
+                <dd>{shoe.reviewIntelligence.communitySummary ?? "Pending"}</dd>
+              </div>
+            </dl>
+          ) : null}
+          {shoe.reviewIntelligence.consensusPoints.length ? (
+            <div className="detail-chip-row">
+              {shoe.reviewIntelligence.consensusPoints.map((item) => (
+                <span className="pill" key={item}>
+                  {item}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {shoe.reviewIntelligence.debates.length ? (
+            <div className="detail-chip-row">
+              {shoe.reviewIntelligence.debates.map((item) => (
+                <span className="pill" key={item}>
+                  {item}
+                </span>
+              ))}
+            </div>
           ) : null}
         </article>
 
@@ -162,7 +216,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                   </div>
                   <p className="detail-muted">
                     {release.reviewCount} reviews ·{" "}
-                    {release.averageReviewScore ? `${Math.round(release.averageReviewScore)}/100` : "Pending review score"}
+                    {release.reviewScore ? `${release.reviewScore}/100` : "Pending review score"}
                   </p>
                   <div className="card-actions">
                     <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>

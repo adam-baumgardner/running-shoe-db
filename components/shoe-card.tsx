@@ -89,7 +89,11 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
         </div>
         <div>
           <dt>Review score</dt>
-          <dd>{shoe.averageReviewScore ? `${Math.round(shoe.averageReviewScore)}/100` : "Pending"}</dd>
+          <dd>{shoe.reviewScore ? `${shoe.reviewScore}/100` : "Pending"}</dd>
+        </div>
+        <div>
+          <dt>Review read</dt>
+          <dd>{shoe.reviewIntelligence.confidence} confidence</dd>
         </div>
         <div>
           <dt>Reviews</dt>

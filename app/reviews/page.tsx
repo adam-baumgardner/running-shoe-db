@@ -31,7 +31,8 @@ export default async function ReviewsPage() {
                 <span className="pill">{item.sourceType}</span>
                 <span className="pill">{item.category}</span>
                 {item.sentiment ? <span className="pill">{item.sentiment}</span> : null}
-                {item.scoreNormalized100 ? <span className="pill">{item.scoreNormalized100}/100</span> : null}
+                {item.reviewScore ? <span className="pill">Review score {item.reviewScore}/100</span> : null}
+                <span className="pill">{item.reviewConfidence} confidence</span>
               </div>
               <div className="review-feed-header">
                 <div>
@@ -47,6 +48,25 @@ export default async function ReviewsPage() {
               </div>
               <p className="catalog-copy">{item.excerpt ?? "Excerpt pending."}</p>
               {item.aiOverview ? <p className="detail-muted">{item.aiOverview}</p> : null}
+              {item.buyerSignal ? <p className="detail-muted">{item.buyerSignal}</p> : null}
+              {item.consensusPoints.length ? (
+                <div className="detail-chip-row">
+                  {item.consensusPoints.map((point) => (
+                    <span className="pill" key={point}>
+                      {point}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              {item.debates.length ? (
+                <div className="detail-chip-row">
+                  {item.debates.map((point) => (
+                    <span className="pill" key={point}>
+                      {point}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
               <div className="card-actions">
                 <Link className="text-link text-link--cta" href={`/shoes/${item.shoeSlug}/${item.releaseSlug}`}>
                   Open release detail

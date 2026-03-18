@@ -87,10 +87,20 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
           <div>
             <dt>Review score</dt>
             <dd>
-              {shoe.featuredRelease.averageReviewScore
-                ? `${Math.round(shoe.featuredRelease.averageReviewScore)}/100`
+              {shoe.featuredRelease.reviewScore ? `${shoe.featuredRelease.reviewScore}/100` : "Pending"}
+            </dd>
+          </div>
+          <div>
+            <dt>Sentiment signal</dt>
+            <dd>
+              {shoe.featuredRelease.reviewIntelligence.sentimentScore
+                ? `${shoe.featuredRelease.reviewIntelligence.sentimentScore}/100`
                 : "Pending"}
             </dd>
+          </div>
+          <div>
+            <dt>Score confidence</dt>
+            <dd>{shoe.featuredRelease.reviewIntelligence.confidence}</dd>
           </div>
         </dl>
       </section>
@@ -100,6 +110,10 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
           <p className="feature-kicker">Latest Release Summary</p>
           <h2>What stands out right now</h2>
           <p>{shoe.featuredRelease.reviewCoverage.summary}</p>
+          <p className="detail-muted">{shoe.featuredRelease.reviewIntelligence.summary}</p>
+          {shoe.featuredRelease.reviewIntelligence.buyerSignal ? (
+            <p className="catalog-copy">{shoe.featuredRelease.reviewIntelligence.buyerSignal}</p>
+          ) : null}
           <div className="detail-chip-row">
             <span className="pill">{shoe.featuredRelease.reviewCoverage.sourceCount} sources</span>
             <span className="pill">{shoe.featuredRelease.reviewCoverage.reviewCount} reviews</span>
@@ -112,6 +126,15 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
               {shoe.featuredRelease.reviewReconciliation.topTakeaways.map((takeaway) => (
                 <span className="pill" key={takeaway}>
                   {takeaway}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {shoe.featuredRelease.reviewIntelligence.debates.length ? (
+            <div className="detail-chip-row">
+              {shoe.featuredRelease.reviewIntelligence.debates.map((debate) => (
+                <span className="pill" key={debate}>
+                  {debate}
                 </span>
               ))}
             </div>
@@ -144,7 +167,7 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                   </div>
                   <p className="detail-muted">
                     {release.reviewCount} reviews ·{" "}
-                    {release.averageReviewScore ? `${Math.round(release.averageReviewScore)}/100` : "Pending review score"}
+                    {release.reviewScore ? `${release.reviewScore}/100` : "Pending review score"}
                   </p>
                   <div className="card-actions">
                     <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
