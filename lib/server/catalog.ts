@@ -52,6 +52,9 @@ export interface ReviewIntelligence {
   sentimentScore: number | null;
   editorialScore: number | null;
   communityScore: number | null;
+  editorialSentiment: ReviewSentiment | null;
+  communitySentiment: ReviewSentiment | null;
+  sourceAlignment: "aligned" | "mixed" | "divergent";
   editorialSummary: string | null;
   communitySummary: string | null;
   confidence: ReviewConfidence;
@@ -1871,6 +1874,10 @@ function buildReviewIntelligence(
         weight: getReviewWeight(review),
       })),
   );
+  const editorialSentiment = getWeightedSentiment(
+    reviews.filter((review) => review.sourceType === "editorial"),
+    aiReviewSummary,
+  );
   const communityScore = weightedAverage(
     reviews
       .filter((review) => review.sourceType !== "editorial")
@@ -1880,6 +1887,10 @@ function buildReviewIntelligence(
           sentimentToScore(review.sentiment ?? aiReviewSummary?.overallSentiment ?? "mixed"),
         weight: getReviewWeight(review),
       })),
+  );
+  const communitySentiment = getWeightedSentiment(
+    reviews.filter((review) => review.sourceType !== "editorial"),
+    aiReviewSummary,
   );
   const sentimentScore = weightedAverage(
     reviews.map((review) => ({
@@ -1907,8 +1918,11 @@ function buildReviewIntelligence(
     sentimentScore: sentimentScore === null ? null : Math.round(sentimentScore),
     editorialScore: editorialScore === null ? null : Math.round(editorialScore),
     communityScore: communityScore === null ? null : Math.round(communityScore),
-    editorialSummary: buildChannelSummary("Editorial", editorialScore),
-    communitySummary: buildChannelSummary("Community", communityScore),
+    editorialSentiment,
+    communitySentiment,
+    sourceAlignment: deriveSourceAlignment(editorialSentiment, communitySentiment),
+    editorialSummary: buildChannelSummary("Editorial", editorialScore, editorialSentiment),
+    communitySummary: buildChannelSummary("Community", communityScore, communitySentiment),
     confidence,
     agreement,
     sourceCount,
@@ -1954,6 +1968,9 @@ function buildAggregateReviewIntelligence(
     sentimentScore: sentimentScore === null ? null : Math.round(sentimentScore),
     editorialScore: null,
     communityScore: null,
+    editorialSentiment: null,
+    communitySentiment: null,
+    sourceAlignment: "mixed",
     editorialSummary: null,
     communitySummary: null,
     confidence,
@@ -1993,19 +2010,76 @@ function buildReviewIntelligenceSummary(
   return `${tone} review signal across ${sourceCount || reviewCount} indexed sources and ${reviewCount} approved reviews.`;
 }
 
-function buildChannelSummary(channel: "Editorial" | "Community", score: number | null) {
-  if (score === null) {
+function buildChannelSummary(
+  channel: "Editorial" | "Community",
+  score: number | null,
+  sentiment: ReviewSentiment | null,
+) {
+  if (score === null && sentiment === null) {
     return null;
   }
 
-  const tone =
-    score >= 88 ? "very positive"
-    : score >= 80 ? "positive"
-    : score >= 72 ? "mixed-positive"
-    : score >= 64 ? "mixed"
-    : "cautious";
+  const tone = sentiment
+    ? sentiment === "positive"
+      ? "positive"
+      : sentiment === "negative"
+        ? "cautious"
+        : "mixed"
+    : score !== null && score >= 88
+      ? "very positive"
+      : score !== null && score >= 80
+        ? "positive"
+        : score !== null && score >= 72
+          ? "mixed-positive"
+          : score !== null && score >= 64
+            ? "mixed"
+            : "cautious";
 
   return `${channel} sentiment reads ${tone}.`;
+}
+
+function getWeightedSentiment(
+  reviews: ShoeDetail["reviews"],
+  aiReviewSummary: ReleaseAiReviewSummary | null,
+): ReviewSentiment | null {
+  if (!reviews.length) {
+    return aiReviewSummary?.overallSentiment ?? null;
+  }
+
+  const weighted = {
+    positive: 0,
+    mixed: 0,
+    negative: 0,
+  };
+
+  for (const review of reviews) {
+    const sentiment = review.sentiment ?? aiReviewSummary?.overallSentiment ?? "mixed";
+    weighted[sentiment] += getReviewWeight(review);
+  }
+
+  return getDominantSentiment(weighted);
+}
+
+function deriveSourceAlignment(
+  editorialSentiment: ReviewSentiment | null,
+  communitySentiment: ReviewSentiment | null,
+): ReviewIntelligence["sourceAlignment"] {
+  if (!editorialSentiment || !communitySentiment) {
+    return "mixed";
+  }
+
+  if (editorialSentiment === communitySentiment) {
+    return "aligned";
+  }
+
+  if (
+    (editorialSentiment === "positive" && communitySentiment === "negative")
+    || (editorialSentiment === "negative" && communitySentiment === "positive")
+  ) {
+    return "divergent";
+  }
+
+  return "mixed";
 }
 
 function buildFallbackBuyerSignal(

@@ -78,6 +78,10 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       values: selectedRows.map((shoe) => shoe.reviewIntelligence.communitySummary ?? "Pending"),
     },
     {
+      label: "Source alignment",
+      values: selectedRows.map((shoe) => shoe.reviewIntelligence.sourceAlignment),
+    },
+    {
       label: "Review read",
       values: selectedRows.map((shoe) => shoe.reviewIntelligence.summary),
     },

@@ -160,6 +160,10 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                 <dt>Community read</dt>
                 <dd>{shoe.reviewIntelligence.communitySummary ?? "Pending"}</dd>
               </div>
+              <div>
+                <dt>Source alignment</dt>
+                <dd>{shoe.reviewIntelligence.sourceAlignment}</dd>
+              </div>
             </dl>
           ) : null}
           {shoe.reviewIntelligence.consensusPoints.length ? (
