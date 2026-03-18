@@ -1,27 +1,75 @@
-import { reviewPipeline } from "@/lib/data";
+import Link from "next/link";
+import { getReviewsFeedData } from "@/lib/server/catalog";
 
-export default function ReviewsPage() {
+export default async function ReviewsPage() {
+  const { items } = await getReviewsFeedData();
+
   return (
     <main className="page-shell">
-      <section className="hero">
+      <section className="hero hero--single">
         <div>
           <p className="eyebrow">Reviews</p>
-          <h1>Editorial and community reviews with source context.</h1>
+          <h1>Latest running shoe reviews, in one feed.</h1>
           <p className="hero-copy">
-            Reviews will be treated as structured content, not just text blobs. That lets us show
-            both sentiment and why reviewers arrived there.
+            This feed pulls approved editorial and community reviews into one place, sorted newest
+            first, so you can scan what just landed and jump straight into the shoe pages that
+            matter.
           </p>
+          <div className="detail-chip-row">
+            <span className="pill">{items.length} reviews</span>
+            <span className="pill">Newest first</span>
+          </div>
         </div>
       </section>
 
-      <section className="section-grid" aria-label="Review pipeline">
-        {reviewPipeline.map((step) => (
-          <article key={step.title} className="feature-panel">
-            <p className="feature-kicker">{step.kicker}</p>
-            <h2>{step.title}</h2>
-            <p>{step.description}</p>
+      <section className="review-feed" aria-label="Latest reviews">
+        {items.length ? (
+          items.map((item) => (
+            <article key={item.id} className="detail-panel review-feed-item">
+              <div className="catalog-card-topline">
+                <span className="pill">{item.sourceName}</span>
+                <span className="pill">{item.sourceType}</span>
+                <span className="pill">{item.category}</span>
+                {item.sentiment ? <span className="pill">{item.sentiment}</span> : null}
+                {item.scoreNormalized100 ? <span className="pill">{item.scoreNormalized100}/100</span> : null}
+              </div>
+              <div className="review-feed-header">
+                <div>
+                  <p className="feature-kicker">
+                    {item.brand} {item.release}
+                  </p>
+                  <h2>{item.title ?? `${item.brand} ${item.release}`}</h2>
+                </div>
+                <p className="detail-muted">
+                  {item.publishedAt ?? "Date pending"}
+                  {item.authorName ? ` · ${item.authorName}` : ""}
+                </p>
+              </div>
+              <p className="catalog-copy">{item.excerpt ?? "Excerpt pending."}</p>
+              {item.aiOverview ? <p className="detail-muted">{item.aiOverview}</p> : null}
+              <div className="card-actions">
+                <Link className="text-link text-link--cta" href={`/shoes/${item.shoeSlug}/${item.releaseSlug}`}>
+                  Open release detail
+                </Link>
+                <Link className="text-link" href={`/shoes/${item.shoeSlug}`}>
+                  Open shoe page
+                </Link>
+                <a className="text-link" href={item.sourceUrl} target="_blank" rel="noreferrer">
+                  Open source review
+                </a>
+              </div>
+            </article>
+          ))
+        ) : (
+          <article className="detail-panel">
+            <p className="feature-kicker">Reviews</p>
+            <h2>No approved reviews are available yet.</h2>
+            <p className="catalog-copy">
+              As reviews are approved in the editorial workflow, they will appear here in
+              reverse-chronological order.
+            </p>
           </article>
-        ))}
+        )}
       </section>
     </main>
   );

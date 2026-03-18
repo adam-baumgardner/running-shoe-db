@@ -13,15 +13,14 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
     notFound();
   }
 
-  const featuredReleaseHref = `/shoes/${shoe.slug}/${shoe.releases[0]?.releaseSlug ?? slug}`;
-  const getReleaseIdBySlug = (releaseSlug: string) =>
-    shoe.releases.find((release) => release.releaseSlug === releaseSlug)?.id ?? null;
-  const getReleaseIdByName = (releaseName: string) =>
-    shoe.releases.find((release) => release.release === releaseName)?.id ?? null;
+  const latestRelease = shoe.releases[0];
+  const latestReleaseHref = latestRelease
+    ? `/shoes/${shoe.slug}/${latestRelease.releaseSlug}`
+    : `/shoes/${shoe.slug}`;
 
   return (
     <main className="page-shell detail-shell">
-      <section className="detail-hero">
+      <section className="hero hero--single">
         <div>
           <p className="eyebrow">{shoe.category}</p>
           <h1>
@@ -31,82 +30,76 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
           <div className="detail-chip-row">
             <span className="pill">{shoe.terrain}</span>
             <span className="pill">{shoe.stability}</span>
-            <span className="pill">{shoe.releases.length} tracked releases</span>
-            <span className="pill">{shoe.featuredRelease.reviewCoverage.status} latest coverage</span>
+            <span className="pill">{shoe.releases.length} releases</span>
           </div>
         </div>
-        <aside className="hero-card">
-          <p className="hero-card-label">Featured Release</p>
-          <h2>{shoe.featuredRelease.release}</h2>
-          <dl>
-            <div>
-              <dt>MSRP</dt>
-              <dd>{shoe.featuredRelease.priceUsd ? `$${shoe.featuredRelease.priceUsd}` : "Pending"}</dd>
-            </div>
-            <div>
-              <dt>Release</dt>
-              <dd>{shoe.featuredRelease.releaseYear ?? "Pending"}</dd>
-            </div>
-            <div>
-              <dt>Weight</dt>
-              <dd>{shoe.featuredRelease.weightOz ? `${shoe.featuredRelease.weightOz} oz` : "Pending"}</dd>
-            </div>
-            <div>
-              <dt>Drop</dt>
-              <dd>{shoe.featuredRelease.dropMm ? `${shoe.featuredRelease.dropMm} mm` : "Pending"}</dd>
-            </div>
-            <div>
-              <dt>Avg review</dt>
-              <dd>
-                {shoe.featuredRelease.averageReviewScore
-                  ? `${Math.round(shoe.featuredRelease.averageReviewScore)}/100`
-                  : "Pending"}
-              </dd>
-            </div>
-          </dl>
+      </section>
+
+      <section className="detail-panel detail-panel--hero-summary">
+        <div className="detail-panel-heading">
+          <div>
+            <p className="feature-kicker">Latest Release</p>
+            <h2>{shoe.featuredRelease.release}</h2>
+          </div>
           <div className="card-actions">
-            <a className="text-link" href={featuredReleaseHref}>
-              Open featured release
+            <a className="text-link text-link--cta" href={latestReleaseHref}>
+              Open latest release
+            </a>
+            <a className="text-link" href={`/compare?release=${shoe.featuredRelease.id}`}>
+              Compare latest release
             </a>
           </div>
-        </aside>
-      </section>
-
-      <section className="detail-panel release-rail-panel">
-        <p className="feature-kicker">Version Rail</p>
-        <h2>Jump between releases</h2>
-        <div className="release-rail">
-          {shoe.releases.map((release, index) => (
-            <div
-              className={`release-rail-item ${index === 0 ? "release-rail-item--active" : ""}`}
-              key={release.id}
-            >
-              <a href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
-                <strong>{release.release}</strong>
-              </a>
-              <span>{release.releaseYear ?? "Pending year"}</span>
-              <span>{release.reviewCoverage.status} coverage</span>
-              {release.changeTeaser.length ? (
-                <p className="detail-muted release-teaser">{release.changeTeaser[0]}</p>
-              ) : null}
-              <div className="card-actions">
-                <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
-                  Open
-                </a>
-                <a className="text-link text-link--cta" href={`/compare?release=${release.id}`}>
-                  Compare
-                </a>
-              </div>
-            </div>
-          ))}
         </div>
+        <p className="catalog-copy">
+          {shoe.featuredRelease.aiReviewSummary?.overview ?? shoe.featuredRelease.reviewCoverage.summary}
+        </p>
+        <dl className="spec-grid spec-grid--wide">
+          <div>
+            <dt>Release year</dt>
+            <dd>{shoe.featuredRelease.releaseYear ?? "Pending"}</dd>
+          </div>
+          <div>
+            <dt>MSRP</dt>
+            <dd>{shoe.featuredRelease.priceUsd ? `$${shoe.featuredRelease.priceUsd}` : "Pending"}</dd>
+          </div>
+          <div>
+            <dt>Weight</dt>
+            <dd>{shoe.featuredRelease.weightOz ? `${shoe.featuredRelease.weightOz} oz` : "Pending"}</dd>
+          </div>
+          <div>
+            <dt>Heel stack</dt>
+            <dd>{shoe.featuredRelease.heelStackMm ? `${shoe.featuredRelease.heelStackMm} mm` : "Pending"}</dd>
+          </div>
+          <div>
+            <dt>Forefoot stack</dt>
+            <dd>
+              {shoe.featuredRelease.forefootStackMm ? `${shoe.featuredRelease.forefootStackMm} mm` : "Pending"}
+            </dd>
+          </div>
+          <div>
+            <dt>Drop</dt>
+            <dd>{shoe.featuredRelease.dropMm ? `${shoe.featuredRelease.dropMm} mm` : "Pending"}</dd>
+          </div>
+          <div>
+            <dt>Plate</dt>
+            <dd>{shoe.featuredRelease.isPlated ? "Plated" : "Non-plated"}</dd>
+          </div>
+          <div>
+            <dt>Review score</dt>
+            <dd>
+              {shoe.featuredRelease.averageReviewScore
+                ? `${Math.round(shoe.featuredRelease.averageReviewScore)}/100`
+                : "Pending"}
+            </dd>
+          </div>
+        </dl>
       </section>
 
-      <section className="detail-grid">
+      <section className="detail-grid detail-grid--two">
         <article className="detail-panel">
-          <p className="feature-kicker">Latest Release</p>
-          <h2>{shoe.featuredRelease.release}</h2>
-          <p>{shoe.featuredRelease.aiReviewSummary?.overview ?? shoe.featuredRelease.reviewCoverage.summary}</p>
+          <p className="feature-kicker">Latest Release Summary</p>
+          <h2>What stands out right now</h2>
+          <p>{shoe.featuredRelease.reviewCoverage.summary}</p>
           <div className="detail-chip-row">
             <span className="pill">{shoe.featuredRelease.reviewCoverage.sourceCount} sources</span>
             <span className="pill">{shoe.featuredRelease.reviewCoverage.reviewCount} reviews</span>
@@ -114,24 +107,34 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
               Freshest review: {shoe.featuredRelease.reviewCoverage.freshestReviewDate ?? "Unknown"}
             </span>
           </div>
+          {shoe.featuredRelease.reviewReconciliation.topTakeaways.length ? (
+            <div className="detail-chip-row">
+              {shoe.featuredRelease.reviewReconciliation.topTakeaways.map((takeaway) => (
+                <span className="pill" key={takeaway}>
+                  {takeaway}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </article>
 
         <article className="detail-panel">
-          <p className="feature-kicker">Release History</p>
-          <h2>Tracked versions</h2>
-          <div className="review-list">
-            {shoe.releases.map((release) => (
-              <article className="review-card" key={release.id}>
-                <div className="catalog-card-topline">
-                  <span className="pill">{release.releaseYear ?? "Pending year"}</span>
-                  {release.isCurrent ? <span className="pill">current</span> : null}
-                  <span className="pill">{release.reviewCoverage.status}</span>
-                </div>
-                <h3>{release.release}</h3>
-                <p className="detail-muted">
-                  MSRP {release.priceUsd ? `$${release.priceUsd}` : "Pending"} • {release.reviewCount} reviews
-                </p>
-                {release.changeTeaser.length ? (
+          <p className="feature-kicker">Past Releases</p>
+          <h2>See how this shoe line changed</h2>
+          <div className="release-list">
+            {shoe.releases.map((release, index) => (
+              <details className="release-list-item" key={release.id} open={index === 0}>
+                <summary>
+                  <span>
+                    <strong>{release.release}</strong>
+                    <span className="detail-muted">
+                      {release.releaseYear ?? "Pending year"} ·{" "}
+                      {release.priceUsd ? `$${release.priceUsd}` : "Pending MSRP"}
+                    </span>
+                  </span>
+                  <span className="pill">{index === 0 ? "Latest release" : "Past release"}</span>
+                </summary>
+                <div className="release-list-body">
                   <div className="detail-chip-row">
                     {release.changeTeaser.map((item) => (
                       <span className="pill" key={item}>
@@ -139,58 +142,41 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                       </span>
                     ))}
                   </div>
-                ) : null}
-                <div className="card-actions">
-                  <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
-                    Open release detail
-                  </a>
-                  <a className="text-link" href={`/compare?release=${release.id}`}>
-                    Compare this release
-                  </a>
+                  <p className="detail-muted">
+                    {release.reviewCount} reviews ·{" "}
+                    {release.averageReviewScore ? `${Math.round(release.averageReviewScore)}/100` : "Pending review score"}
+                  </p>
+                  <div className="card-actions">
+                    <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
+                      Open release
+                    </a>
+                    <a className="text-link" href={`/compare?release=${release.id}`}>
+                      Compare release
+                    </a>
+                  </div>
                 </div>
-              </article>
+              </details>
             ))}
           </div>
         </article>
 
         <article className="detail-panel">
           <p className="feature-kicker">What Changed</p>
-          <h2>Release-to-release deltas</h2>
+          <h2>Release-to-release changes</h2>
           <div className="review-list">
             {shoe.releaseChanges.map((change) => (
               <article key={change.releaseSlug} className="review-card">
                 <div className="catalog-card-topline">
                   <span className="pill">{change.release}</span>
-                  {change.previousRelease ? (
-                    <span className="pill">vs {change.previousRelease}</span>
-                  ) : null}
+                  {change.previousRelease ? <span className="pill">vs {change.previousRelease}</span> : null}
                 </div>
                 <h3>{change.release}</h3>
-                {change.changes.length ? (
-                  <div className="detail-chip-row">
-                    {change.changes.map((item) => (
-                      <span className="pill" key={item}>
-                        {item}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="detail-muted">No major structured changes detected.</p>
-                )}
-                <div className="card-actions">
-                  <a className="text-link" href={`/shoes/${shoe.slug}/${change.releaseSlug}`}>
-                    Open this release
-                  </a>
-                  {change.previousRelease &&
-                  getReleaseIdBySlug(change.releaseSlug) &&
-                  getReleaseIdByName(change.previousRelease) ? (
-                    <a
-                      className="text-link text-link--cta"
-                      href={`/compare?release=${getReleaseIdBySlug(change.releaseSlug)}&release=${getReleaseIdByName(change.previousRelease)}`}
-                    >
-                      Compare versions
-                    </a>
-                  ) : null}
+                <div className="detail-chip-row">
+                  {change.changes.map((item) => (
+                    <span className="pill" key={item}>
+                      {item}
+                    </span>
+                  ))}
                 </div>
               </article>
             ))}

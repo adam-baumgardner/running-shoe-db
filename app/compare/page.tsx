@@ -189,7 +189,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
             </p>
             <div className="card-actions">
               <Link className="text-link" href={`/shoes/${shoe.slug}/${shoe.releaseSlug}`}>
-                Open shoe detail
+                Open release detail
               </Link>
             </div>
           </article>

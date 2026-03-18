@@ -20,31 +20,85 @@ export interface CatalogCard {
   release: string;
   slug: string;
   releaseSlug: string;
+  releaseYear: number | null;
   category: string;
+  foam: string | null;
   rideProfile: string;
   usageSummary: string | null;
+  priceUsd: number | null;
   weightOz: number | null;
+  heelStackMm: number | null;
+  forefootStackMm: number | null;
   dropMm: number | null;
   reviewCount: number;
+  averageReviewScore: number | null;
   terrain: string;
   stability: string;
   isPlated: boolean;
+  isCurrent: boolean;
 }
 
 export interface CatalogFilters {
   q?: string;
+  sort?: string;
+  direction?: string;
+  brand?: string;
   category?: string;
   terrain?: string;
   stability?: string;
   plated?: string;
+  current?: string;
+  minPrice?: string;
+  maxPrice?: string;
+  minWeight?: string;
+  maxWeight?: string;
+  minHeelStack?: string;
+  maxHeelStack?: string;
+  minForefootStack?: string;
+  maxForefootStack?: string;
+  minDrop?: string;
+  maxDrop?: string;
+  minReviewScore?: string;
+  minReviewCount?: string;
 }
 
 export interface CatalogPageData {
   shoes: CatalogCard[];
+  activeFilters: Array<{ key: string; label: string; value: string }>;
   filterOptions: {
+    brands: string[];
     categories: string[];
     terrains: string[];
     stabilities: string[];
+  };
+}
+
+export interface ReviewsFeedItem {
+  id: string;
+  brand: string;
+  model: string;
+  release: string;
+  shoeSlug: string;
+  releaseSlug: string;
+  category: string;
+  sourceName: string;
+  sourceType: "editorial" | "reddit" | "user";
+  sourceUrl: string;
+  title: string | null;
+  excerpt: string | null;
+  sentiment: "positive" | "mixed" | "negative" | null;
+  scoreNormalized100: number | null;
+  publishedAt: string | null;
+  authorName: string | null;
+  aiOverview: string | null;
+}
+
+export interface ReviewsFeedData {
+  items: ReviewsFeedItem[];
+  filterOptions: {
+    brands: string[];
+    categories: string[];
+    sourceTypes: Array<"editorial" | "reddit" | "user">;
   };
 }
 
@@ -218,7 +272,9 @@ export async function getCatalogPageData(filters: CatalogFilters = {}): Promise<
 
   return {
     shoes,
+    activeFilters: buildActiveFilterChips(filters),
     filterOptions: {
+      brands: uniq(allShoes.map((shoe) => shoe.brand)),
       categories: uniq(allShoes.map((shoe) => shoe.category)),
       terrains: uniq(allShoes.map((shoe) => shoe.terrain)),
       stabilities: uniq(allShoes.map((shoe) => shoe.stability)),
@@ -240,15 +296,21 @@ export async function getCatalogCards(filters: CatalogFilters = {}): Promise<Cat
         model: shoes.name,
         release: shoeReleases.versionName,
         slug: shoes.slug,
+        releaseYear: shoeReleases.releaseYear,
         category: shoes.category,
         terrain: shoes.terrain,
         stability: shoes.stability,
         usageSummary: shoes.usageSummary,
+        priceUsd: shoeReleases.msrpUsd,
+        isCurrent: shoeReleases.isCurrent,
         isPlated: shoeReleases.isPlated,
         foam: shoeReleases.foam,
         weightOzMen: shoeSpecs.weightOzMen,
+        heelStackMm: shoeSpecs.heelStackMm,
+        forefootStackMm: shoeSpecs.forefootStackMm,
         dropMm: shoeSpecs.dropMm,
         reviewCount: count(reviews.id),
+        averageReviewScore: avg(reviews.scoreNormalized100),
       })
       .from(shoeReleases)
       .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
@@ -263,14 +325,19 @@ export async function getCatalogCards(filters: CatalogFilters = {}): Promise<Cat
         brands.name,
         shoes.name,
         shoes.slug,
+        shoeReleases.releaseYear,
         shoes.category,
         shoes.terrain,
         shoes.stability,
         shoes.usageSummary,
         shoeReleases.versionName,
+        shoeReleases.msrpUsd,
+        shoeReleases.isCurrent,
         shoeReleases.isPlated,
         shoeReleases.foam,
         shoeSpecs.weightOzMen,
+        shoeSpecs.heelStackMm,
+        shoeSpecs.forefootStackMm,
         shoeSpecs.dropMm
       )
       .orderBy(desc(shoeReleases.releaseYear), brands.name, shoes.name);
@@ -278,24 +345,31 @@ export async function getCatalogCards(filters: CatalogFilters = {}): Promise<Cat
     const parsedRows: CatalogCard[] = rows.map((row) => ({
       id: row.id,
       brand: row.brand,
-      model: row.model,
-      release: row.release,
-      slug: row.slug,
-      releaseSlug: slugifyRelease(row.release),
-      category: humanizeCategory(row.category),
-      terrain: humanizeCategory(row.terrain),
-      stability: capitalize(row.stability),
-      rideProfile: buildRideProfile(row.foam, row.isPlated),
-      usageSummary: row.usageSummary,
-      weightOz: row.weightOzMen ? Number(row.weightOzMen) : null,
-      dropMm: row.dropMm,
-      reviewCount: Number(row.reviewCount),
-      isPlated: row.isPlated,
-    }));
+        model: row.model,
+        release: row.release,
+        slug: row.slug,
+        releaseSlug: slugifyRelease(row.release),
+        releaseYear: row.releaseYear,
+        category: humanizeCategory(row.category),
+        terrain: humanizeCategory(row.terrain),
+        stability: capitalize(row.stability),
+        foam: row.foam,
+        rideProfile: buildRideProfile(row.foam, row.isPlated),
+        usageSummary: row.usageSummary,
+        priceUsd: row.priceUsd ? Number(row.priceUsd) : null,
+        weightOz: row.weightOzMen ? Number(row.weightOzMen) : null,
+        heelStackMm: row.heelStackMm,
+        forefootStackMm: row.forefootStackMm,
+        dropMm: row.dropMm,
+        reviewCount: Number(row.reviewCount),
+        averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
+        isPlated: row.isPlated,
+        isCurrent: row.isCurrent,
+      }));
 
-    return filterCatalog(parsedRows, filters);
+    return sortCatalog(filterCatalog(parsedRows, filters), filters);
   } catch {
-    return filterCatalog(buildFallbackCatalog(), filters);
+    return sortCatalog(filterCatalog(buildFallbackCatalog(), filters), filters);
   }
 }
 
@@ -1047,10 +1121,12 @@ export async function getComparisonRows(selectedReleaseIds: string[]): Promise<C
         model: shoes.name,
         release: shoeReleases.versionName,
         slug: shoes.slug,
+        releaseYear: shoeReleases.releaseYear,
         category: shoes.category,
         terrain: shoes.terrain,
         stability: shoes.stability,
         usageSummary: shoes.usageSummary,
+        isCurrent: shoeReleases.isCurrent,
         isPlated: shoeReleases.isPlated,
         foam: shoeReleases.foam,
         priceUsd: shoeReleases.msrpUsd,
@@ -1081,6 +1157,8 @@ export async function getComparisonRows(selectedReleaseIds: string[]): Promise<C
         shoes.stability,
         shoes.usageSummary,
         shoeReleases.versionName,
+        shoeReleases.releaseYear,
+        shoeReleases.isCurrent,
         shoeReleases.isPlated,
         shoeReleases.foam,
         shoeReleases.msrpUsd,
@@ -1099,9 +1177,11 @@ export async function getComparisonRows(selectedReleaseIds: string[]): Promise<C
       release: row.release,
       slug: row.slug,
       releaseSlug: slugifyRelease(row.release),
+      releaseYear: row.releaseYear,
       category: humanizeCategory(row.category),
       terrain: humanizeCategory(row.terrain),
       stability: capitalize(row.stability),
+      foam: row.foam,
       rideProfile: buildRideProfile(row.foam, row.isPlated),
       usageSummary: row.usageSummary,
       weightOz: row.weightOzMen ? Number(row.weightOzMen) : null,
@@ -1110,6 +1190,7 @@ export async function getComparisonRows(selectedReleaseIds: string[]): Promise<C
       dropMm: row.dropMm,
       reviewCount: Number(row.reviewCount),
       isPlated: row.isPlated,
+      isCurrent: row.isCurrent,
       priceUsd: row.priceUsd ? Number(row.priceUsd) : null,
       averageReviewScore: row.averageReviewScore ? Number(row.averageReviewScore) : null,
       reviewCoverage: assessComparisonRowCoverage(row.metadata, Number(row.reviewCount)),
@@ -1118,6 +1199,88 @@ export async function getComparisonRows(selectedReleaseIds: string[]): Promise<C
     }));
   } catch {
     return buildFallbackComparison(buildFallbackCatalog().slice(0, Math.min(3, releaseIds.length)));
+  }
+}
+
+export async function getReviewsFeedData(): Promise<ReviewsFeedData> {
+  if (!process.env.DATABASE_URL) {
+    return {
+      items: [],
+      filterOptions: {
+        brands: [],
+        categories: [],
+        sourceTypes: ["editorial", "reddit", "user"],
+      },
+    };
+  }
+
+  try {
+    const db = getDb();
+    const rows = await db
+      .select({
+        id: reviews.id,
+        brand: brands.name,
+        model: shoes.name,
+        release: shoeReleases.versionName,
+        shoeSlug: shoes.slug,
+        category: shoes.category,
+        sourceName: reviewSources.name,
+        sourceType: reviewSources.sourceType,
+        sourceUrl: reviews.sourceUrl,
+        title: reviews.title,
+        excerpt: reviews.excerpt,
+        sentiment: reviews.sentiment,
+        scoreNormalized100: reviews.scoreNormalized100,
+        publishedAt: reviews.publishedAt,
+        authorName: reviewAuthors.displayName,
+        metadata: shoeReleases.metadata,
+      })
+      .from(reviews)
+      .innerJoin(shoeReleases, eq(reviews.releaseId, shoeReleases.id))
+      .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+      .innerJoin(brands, eq(shoes.brandId, brands.id))
+      .innerJoin(reviewSources, eq(reviews.sourceId, reviewSources.id))
+      .leftJoin(reviewAuthors, eq(reviews.authorId, reviewAuthors.id))
+      .where(eq(reviews.status, "approved"))
+      .orderBy(desc(reviews.publishedAt), desc(reviews.createdAt));
+
+    const items = rows.map((row) => ({
+      id: row.id,
+      brand: row.brand,
+      model: row.model,
+      release: row.release,
+      shoeSlug: row.shoeSlug,
+      releaseSlug: slugifyRelease(row.release),
+      category: humanizeCategory(row.category),
+      sourceName: row.sourceName,
+      sourceType: row.sourceType,
+      sourceUrl: row.sourceUrl,
+      title: row.title,
+      excerpt: row.excerpt,
+      sentiment: row.sentiment,
+      scoreNormalized100: row.scoreNormalized100,
+      publishedAt: row.publishedAt ? row.publishedAt.toISOString().slice(0, 10) : null,
+      authorName: row.authorName,
+      aiOverview: getReleaseAiReviewSummary(row.metadata)?.overview ?? null,
+    }));
+
+    return {
+      items,
+      filterOptions: {
+        brands: uniq(items.map((item) => item.brand)),
+        categories: uniq(items.map((item) => item.category)),
+        sourceTypes: uniq(items.map((item) => item.sourceType)) as Array<"editorial" | "reddit" | "user">,
+      },
+    };
+  } catch {
+    return {
+      items: [],
+      filterOptions: {
+        brands: [],
+        categories: [],
+        sourceTypes: ["editorial", "reddit", "user"],
+      },
+    };
   }
 }
 
@@ -1141,15 +1304,22 @@ function buildFallbackCatalog(): CatalogCard[] {
     release: shoe.name,
     slug: `${shoe.brand}-${shoe.name}`.toLowerCase().replaceAll(" ", "-"),
     releaseSlug: slugifyRelease(shoe.name),
+    releaseYear: 2024,
     category: shoe.category,
+    foam: "Responsive foam",
     terrain: "Road",
     stability: "Neutral",
     rideProfile: shoe.rideProfile,
     usageSummary: shoe.category,
+    priceUsd: index === 1 ? 170 : 140,
     weightOz: shoe.weightOz,
+    heelStackMm: shoe.dropMm ? shoe.dropMm + 28 : null,
+    forefootStackMm: 28,
     dropMm: shoe.dropMm,
     reviewCount: 1,
+    averageReviewScore: 80 + index * 5,
     isPlated: false,
+    isCurrent: true,
   }));
 }
 
@@ -1763,19 +1933,204 @@ function filterCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
   return shoes.filter((shoe) => {
     const q = filters.q?.trim().toLowerCase();
     if (q) {
-      const haystack = `${shoe.brand} ${shoe.model} ${shoe.release} ${shoe.usageSummary ?? ""}`
-        .toLowerCase();
+      const haystack = `${shoe.brand} ${shoe.model} ${shoe.release} ${shoe.usageSummary ?? ""} ${
+        shoe.rideProfile
+      } ${shoe.foam ?? ""}`.toLowerCase();
       if (!haystack.includes(q)) return false;
     }
 
+    if (filters.brand && shoe.brand !== filters.brand) return false;
     if (filters.category && shoe.category !== filters.category) return false;
     if (filters.terrain && shoe.terrain !== filters.terrain) return false;
     if (filters.stability && shoe.stability !== filters.stability) return false;
     if (filters.plated === "plated" && !shoe.isPlated) return false;
     if (filters.plated === "non-plated" && shoe.isPlated) return false;
+    if (filters.current === "current" && !shoe.isCurrent) return false;
+
+    if (!matchesMinMax(shoe.priceUsd, filters.minPrice, filters.maxPrice)) return false;
+    if (!matchesMinMax(shoe.weightOz, filters.minWeight, filters.maxWeight)) return false;
+    if (!matchesMinMax(shoe.heelStackMm, filters.minHeelStack, filters.maxHeelStack)) return false;
+    if (!matchesMinMax(shoe.forefootStackMm, filters.minForefootStack, filters.maxForefootStack)) return false;
+    if (!matchesMinMax(shoe.dropMm, filters.minDrop, filters.maxDrop)) return false;
+
+    const minReviewScore = parseNumber(filters.minReviewScore);
+    if (minReviewScore !== null && (shoe.averageReviewScore ?? -1) < minReviewScore) return false;
+
+    const minReviewCount = parseNumber(filters.minReviewCount);
+    if (minReviewCount !== null && shoe.reviewCount < minReviewCount) return false;
 
     return true;
   });
+}
+
+function sortCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
+  const q = filters.q?.trim();
+  const sortKey = filters.sort ?? (q ? "relevance" : "latest");
+  const direction =
+    filters.direction ??
+    (sortKey === "brand" || sortKey === "category" ? "asc" : "desc");
+
+  const sorted = [...shoes].sort((left, right) => {
+    if (sortKey === "relevance") {
+      const delta = compareRelevance(left, right, q ?? "");
+      if (delta !== 0) return delta;
+      return compareLatest(left, right);
+    }
+
+    let delta = 0;
+    switch (sortKey) {
+      case "brand":
+        delta = compareString(left.brand, right.brand) || compareString(left.model, right.model);
+        break;
+      case "price":
+        delta = compareNullableNumber(left.priceUsd, right.priceUsd);
+        break;
+      case "weight":
+        delta = compareNullableNumber(left.weightOz, right.weightOz);
+        break;
+      case "heel-stack":
+        delta = compareNullableNumber(left.heelStackMm, right.heelStackMm);
+        break;
+      case "forefoot-stack":
+        delta = compareNullableNumber(left.forefootStackMm, right.forefootStackMm);
+        break;
+      case "drop":
+        delta = compareNullableNumber(left.dropMm, right.dropMm);
+        break;
+      case "review-score":
+        delta = compareNullableNumber(left.averageReviewScore, right.averageReviewScore);
+        break;
+      case "review-count":
+        delta = left.reviewCount - right.reviewCount;
+        break;
+      case "latest":
+      default:
+        delta = compareLatest(left, right);
+        break;
+    }
+
+    if (delta === 0) {
+      delta = compareString(left.brand, right.brand) || compareString(left.release, right.release);
+    }
+
+    return direction === "asc" ? delta : -delta;
+  });
+
+  return sorted;
+}
+
+function buildActiveFilterChips(filters: CatalogFilters) {
+  const chips: Array<{ key: string; label: string; value: string }> = [];
+  const pushIfValue = (key: string, label: string, value?: string) => {
+    if (value && value.trim()) {
+      chips.push({ key, label, value });
+    }
+  };
+
+  pushIfValue("q", "Search", filters.q);
+  pushIfValue("brand", "Brand", filters.brand);
+  pushIfValue("category", "Category", filters.category);
+  pushIfValue("terrain", "Terrain", filters.terrain);
+  pushIfValue("stability", "Stability", filters.stability);
+  pushIfValue("plated", "Plate", filters.plated);
+  if (filters.current === "current") chips.push({ key: "current", label: "Current", value: "Only current models" });
+  pushRangeChip(chips, "price", "Price", filters.minPrice, filters.maxPrice, "$");
+  pushRangeChip(chips, "weight", "Weight", filters.minWeight, filters.maxWeight, "", " oz");
+  pushRangeChip(chips, "heel-stack", "Heel stack", filters.minHeelStack, filters.maxHeelStack, "", " mm");
+  pushRangeChip(
+    chips,
+    "forefoot-stack",
+    "Forefoot stack",
+    filters.minForefootStack,
+    filters.maxForefootStack,
+    "",
+    " mm",
+  );
+  pushRangeChip(chips, "drop", "Drop", filters.minDrop, filters.maxDrop, "", " mm");
+  pushIfValue("minReviewScore", "Min review score", filters.minReviewScore ? `${filters.minReviewScore}+` : "");
+  pushIfValue("minReviewCount", "Min reviews", filters.minReviewCount ? `${filters.minReviewCount}+` : "");
+
+  return chips;
+}
+
+function pushRangeChip(
+  chips: Array<{ key: string; label: string; value: string }>,
+  key: string,
+  label: string,
+  min?: string,
+  max?: string,
+  prefix = "",
+  suffix = "",
+) {
+  if (!min && !max) return;
+  if (min && max) {
+    chips.push({ key, label, value: `${prefix}${min}${suffix} - ${prefix}${max}${suffix}` });
+    return;
+  }
+  if (min) {
+    chips.push({ key, label, value: `>= ${prefix}${min}${suffix}` });
+    return;
+  }
+  chips.push({ key, label, value: `<= ${prefix}${max}${suffix}` });
+}
+
+function compareLatest(left: CatalogCard, right: CatalogCard) {
+  if (left.isCurrent !== right.isCurrent) {
+    return Number(left.isCurrent) - Number(right.isCurrent);
+  }
+
+  return (left.releaseYear ?? 0) - (right.releaseYear ?? 0);
+}
+
+function compareRelevance(left: CatalogCard, right: CatalogCard, query: string) {
+  const normalized = query.toLowerCase();
+  const score = (shoe: CatalogCard) => {
+    let total = 0;
+    const exactRelease = `${shoe.brand} ${shoe.release}`.toLowerCase();
+    const family = `${shoe.brand} ${shoe.model}`.toLowerCase();
+    const haystack = `${family} ${exactRelease} ${shoe.usageSummary ?? ""} ${shoe.rideProfile}`.toLowerCase();
+    if (exactRelease.includes(normalized)) total += 5;
+    if (family.includes(normalized)) total += 4;
+    if (haystack.includes(normalized)) total += 2;
+    if (shoe.isCurrent) total += 1;
+    return total;
+  };
+
+  return score(left) - score(right);
+}
+
+function matchesMinMax(value: number | null, min?: string, max?: string) {
+  const minValue = parseNumber(min);
+  const maxValue = parseNumber(max);
+
+  if (minValue === null && maxValue === null) {
+    return true;
+  }
+
+  if (value === null) {
+    return false;
+  }
+
+  if (minValue !== null && value < minValue) return false;
+  if (maxValue !== null && value > maxValue) return false;
+  return true;
+}
+
+function parseNumber(value?: string) {
+  if (!value?.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function compareNullableNumber(left: number | null, right: number | null) {
+  if (left === null && right === null) return 0;
+  if (left === null) return -1;
+  if (right === null) return 1;
+  return left - right;
+}
+
+function compareString(left: string, right: string) {
+  return left.localeCompare(right);
 }
 
 function capitalize(value: string) {

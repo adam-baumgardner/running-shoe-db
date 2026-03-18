@@ -81,6 +81,10 @@ a {
   grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.9fr);
 }
 
+.hero--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .eyebrow,
 .feature-kicker,
 .hero-card-label {
@@ -157,6 +161,13 @@ a {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.catalog-list,
+.review-feed {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
 .feature-panel {
   padding: 1.5rem;
   border-radius: 1.25rem;
@@ -181,6 +192,76 @@ a {
 .filter-shell {
   margin-top: 2rem;
   padding: 1.25rem;
+}
+
+.catalog-toolbar {
+  display: grid;
+  gap: 1rem;
+}
+
+.catalog-toolbar-main {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(160px, 0.5fr));
+  align-items: end;
+}
+
+.catalog-toolbar-search {
+  min-width: 0;
+}
+
+.catalog-toolbar-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.catalog-filter-panel {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: rgba(255, 248, 239, 0.58);
+}
+
+.catalog-filter-panel summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  padding: 1rem 1.1rem;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.catalog-filter-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.catalog-filter-panel-body {
+  padding: 0 1.1rem 1.1rem;
+}
+
+.filter-grid--catalog {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.catalog-active-filters {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.pill-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(199, 81, 45, 0.2);
+  background: rgba(199, 81, 45, 0.08);
+  color: var(--accent);
+  font-size: 0.82rem;
 }
 
 .filter-grid {
@@ -302,6 +383,59 @@ a {
   padding: 1.4rem;
 }
 
+.catalog-row {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem 1.4rem;
+}
+
+.catalog-row-primary {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 2.2fr) minmax(220px, 0.9fr);
+  align-items: start;
+}
+
+.catalog-row-title {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.catalog-row-title h2 {
+  margin: 0;
+  line-height: 1;
+}
+
+.catalog-row-title p {
+  margin: 0;
+}
+
+.catalog-row-metrics {
+  display: grid;
+  gap: 0.75rem 1rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.catalog-row-metrics div {
+  min-width: 0;
+}
+
+.catalog-row-metrics dt {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.catalog-row-metrics dd {
+  margin: 0.2rem 0 0;
+  font-size: 1rem;
+}
+
+.catalog-row-actions {
+  display: grid;
+  gap: 0.65rem;
+  justify-items: stretch;
+}
+
 .release-rail-panel {
   margin-top: 1.5rem;
 }
@@ -348,6 +482,17 @@ a {
   flex-wrap: wrap;
 }
 
+.detail-panel--hero-summary {
+  margin-top: 1.5rem;
+}
+
+.detail-panel-heading {
+  display: flex;
+  gap: 1rem;
+  align-items: start;
+  justify-content: space-between;
+}
+
 .catalog-card h2,
 .detail-panel h2 {
   margin: 0.2rem 0 0.8rem;
@@ -369,6 +514,10 @@ a {
   margin: 1rem 0 1.2rem;
 }
 
+.spec-grid--wide {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .catalog-stats dt,
 .spec-grid dt {
   color: var(--muted);
@@ -385,6 +534,18 @@ a {
   display: grid;
   gap: 1rem;
   margin-top: 1rem;
+}
+
+.review-feed-item {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.review-feed-header {
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  align-items: start;
 }
 
 .review-card {
@@ -438,12 +599,57 @@ a {
   margin-bottom: 1rem;
 }
 
+.detail-grid--two {
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+}
+
+.release-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.release-list-item {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: rgba(255, 248, 239, 0.62);
+  overflow: hidden;
+}
+
+.release-list-item summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  list-style: none;
+  cursor: pointer;
+}
+
+.release-list-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.release-list-body {
+  display: grid;
+  gap: 0.85rem;
+  padding: 0 1.1rem 1.1rem;
+}
+
 @media (max-width: 900px) {
   .hero,
   .section-grid,
   .catalog-grid,
   .detail-grid,
   .detail-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .catalog-toolbar-main,
+  .filter-grid--catalog,
+  .spec-grid--wide,
+  .catalog-row-primary,
+  .catalog-row-metrics,
+  .detail-grid--two {
     grid-template-columns: 1fr;
   }
 
@@ -461,6 +667,11 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .detail-panel-heading,
+  .review-feed-header {
+    flex-direction: column;
+  }
+
   .editorial-table {
     grid-template-columns: 1fr;
   }
@@ -468,5 +679,9 @@ a {
   .editorial-form-inline {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .catalog-row-actions {
+    justify-items: start;
   }
 }
