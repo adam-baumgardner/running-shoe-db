@@ -5,7 +5,7 @@ import { brands, reviewAuthors, reviews, reviewSources, shoeReleases, shoes } fr
 import { generateReleaseReviewSummary } from "@/lib/ai/review-summary";
 import { appendAiReviewSummaryHistory, mergeReleaseMetadata } from "@/lib/server/release-metadata";
 
-config({ path: ".env.local" });
+config({ path: process.env.DOTENV_CONFIG_PATH || ".env.local" });
 
 async function main() {
   if (!process.env.DATABASE_URL) {
@@ -14,6 +14,8 @@ async function main() {
 
   const limitArg = process.argv.find((arg) => arg.startsWith("--limit="));
   const limit = limitArg ? Number(limitArg.split("=")[1]) : 50;
+  const delayMsArg = process.argv.find((arg) => arg.startsWith("--delay-ms="));
+  const delayMs = delayMsArg ? Number(delayMsArg.split("=")[1]) : 1250;
   const db = getDb();
 
   const releaseRows = await db
@@ -36,6 +38,8 @@ async function main() {
   let generatedCount = 0;
   let refreshedCount = 0;
   let skippedCount = 0;
+  let openAiCount = 0;
+  let heuristicCount = 0;
 
   for (const release of releaseRows) {
     const approvedReviews = await db
@@ -106,13 +110,31 @@ async function main() {
     } else {
       generatedCount += 1;
     }
+
+    if (summary.provider === "openai") {
+      openAiCount += 1;
+    } else {
+      heuristicCount += 1;
+    }
+
+    if (process.env.OPENAI_API_KEY && delayMs > 0) {
+      await sleep(delayMs);
+    }
   }
 
   console.info("AI summary refresh completed", {
     generatedCount,
     refreshedCount,
     skippedCount,
+    openAiCount,
+    heuristicCount,
     openAiConfigured: Boolean(process.env.OPENAI_API_KEY),
+  });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
   });
 }
 

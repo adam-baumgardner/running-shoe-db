@@ -71,135 +71,152 @@ async function generateWithOpenAi(
   input: GenerateReleaseReviewSummaryInput & { reviews: ReviewSummaryInput[] },
 ): Promise<ReleaseAiReviewSummary> {
   const model = process.env.OPENAI_MODEL || "gpt-5-mini";
-  const response = await fetch("https://api.openai.com/v1/responses", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model,
-      input: [
-        {
-          role: "system",
-          content: [
-            {
-              type: "input_text",
-              text:
-                "You summarize running shoe reviews and community discussion. Use only the supplied evidence. Produce concise, factual buyer guidance in plain product language. Distinguish broad consensus from contested points. Explicitly judge editorial sentiment, community sentiment, and whether those two reads align. Prefer specific takeaways over generic hedging. Do not invent specs, comparisons, or opinions that are not supported by the supplied reviews.",
-            },
-          ],
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "input_text",
-              text: JSON.stringify({
-                release: {
-                  label: input.releaseLabel,
-                  category: input.category,
-                  terrain: input.terrain,
-                  stability: input.stability,
-                },
-                instructions: {
-                  overview:
-                    "Write 2-3 sentences that summarize what this shoe is generally like for a buyer right now.",
-                  buyerSignal:
-                    "Write one short line that says what kind of buyer signal the current mix of reviews gives.",
-                  consensusPoints:
-                    "These should be specific patterns reviewers broadly agree on.",
-                  debates:
-                    "These should capture where reviewers disagree or where editorial and community read the shoe differently.",
-                  channelReads:
-                    "Set editorialSentiment and communitySentiment from the actual evidence, not by guessing. If one channel is effectively absent, return null for that channel.",
-                },
-                reviews: input.reviews.map((review) => ({
-                  title: review.title,
-                  sourceName: review.sourceName,
-                  sourceType: review.sourceType,
-                  authorName: review.authorName,
-                  publishedAt: review.publishedAt,
-                  sentiment: review.sentiment,
-                  scoreNormalized100: review.scoreNormalized100,
-                  excerpt: truncateText(review.excerpt, 320),
-                  body: truncateText(review.body, 900),
-                })),
-              }),
-            },
-          ],
-        },
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "shoe_review_summary",
-          strict: true,
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              overview: { type: "string" },
-              overallSentiment: { type: "string", enum: ["positive", "mixed", "negative"] },
-              confidence: { type: "string", enum: ["low", "medium", "high"] },
-              editorialSentiment: { type: ["string", "null"], enum: ["positive", "mixed", "negative", null] },
-              communitySentiment: { type: ["string", "null"], enum: ["positive", "mixed", "negative", null] },
-              sourceAlignment: { type: "string", enum: ["aligned", "mixed", "divergent"] },
-              buyerSignal: { type: ["string", "null"] },
-              pros: {
-                type: "array",
-                items: { type: "string" },
-                maxItems: 4,
-              },
-              cons: {
-                type: "array",
-                items: { type: "string" },
-                maxItems: 4,
-              },
-              bestFor: {
-                type: "array",
-                items: { type: "string" },
-                maxItems: 4,
-              },
-              watchOuts: {
-                type: "array",
-                items: { type: "string" },
-                maxItems: 4,
-              },
-              consensusPoints: {
-                type: "array",
-                items: { type: "string" },
-                maxItems: 4,
-              },
-              debates: {
-                type: "array",
-                items: { type: "string" },
-                maxItems: 4,
-              },
-            },
-            required: [
-              "overview",
-              "overallSentiment",
-              "confidence",
-              "editorialSentiment",
-              "communitySentiment",
-              "sourceAlignment",
-              "buyerSignal",
-              "pros",
-              "cons",
-              "bestFor",
-              "watchOuts",
-              "consensusPoints",
-              "debates",
-            ],
+  const requestBody = JSON.stringify({
+    model,
+    input: [
+      {
+        role: "system",
+        content: [
+          {
+            type: "input_text",
+            text:
+              "You summarize running shoe reviews and community discussion. Use only the supplied evidence. Produce concise, factual buyer guidance in plain product language. Distinguish broad consensus from contested points. Explicitly judge editorial sentiment, community sentiment, and whether those two reads align. Prefer specific takeaways over generic hedging. Do not invent specs, comparisons, or opinions that are not supported by the supplied reviews.",
           },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "input_text",
+            text: JSON.stringify({
+              release: {
+                label: input.releaseLabel,
+                category: input.category,
+                terrain: input.terrain,
+                stability: input.stability,
+              },
+              instructions: {
+                overview:
+                  "Write 2-3 sentences that summarize what this shoe is generally like for a buyer right now.",
+                buyerSignal:
+                  "Write one short line that says what kind of buyer signal the current mix of reviews gives.",
+                consensusPoints:
+                  "These should be specific patterns reviewers broadly agree on.",
+                debates:
+                  "These should capture where reviewers disagree or where editorial and community read the shoe differently.",
+                channelReads:
+                  "Set editorialSentiment and communitySentiment from the actual evidence, not by guessing. If one channel is effectively absent, return null for that channel.",
+              },
+              reviews: input.reviews.map((review) => ({
+                title: review.title,
+                sourceName: review.sourceName,
+                sourceType: review.sourceType,
+                authorName: review.authorName,
+                publishedAt: review.publishedAt,
+                sentiment: review.sentiment,
+                scoreNormalized100: review.scoreNormalized100,
+                excerpt: truncateText(review.excerpt, 320),
+                body: truncateText(review.body, 900),
+              })),
+            }),
+          },
+        ],
+      },
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "shoe_review_summary",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            overview: { type: "string" },
+            overallSentiment: { type: "string", enum: ["positive", "mixed", "negative"] },
+            confidence: { type: "string", enum: ["low", "medium", "high"] },
+            editorialSentiment: { type: ["string", "null"], enum: ["positive", "mixed", "negative", null] },
+            communitySentiment: { type: ["string", "null"], enum: ["positive", "mixed", "negative", null] },
+            sourceAlignment: { type: "string", enum: ["aligned", "mixed", "divergent"] },
+            buyerSignal: { type: ["string", "null"] },
+            pros: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 4,
+            },
+            cons: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 4,
+            },
+            bestFor: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 4,
+            },
+            watchOuts: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 4,
+            },
+            consensusPoints: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 4,
+            },
+            debates: {
+              type: "array",
+              items: { type: "string" },
+              maxItems: 4,
+            },
+          },
+          required: [
+            "overview",
+            "overallSentiment",
+            "confidence",
+            "editorialSentiment",
+            "communitySentiment",
+            "sourceAlignment",
+            "buyerSignal",
+            "pros",
+            "cons",
+            "bestFor",
+            "watchOuts",
+            "consensusPoints",
+            "debates",
+          ],
         },
       },
-    }),
+    },
   });
 
-  if (!response.ok) {
-    throw new Error(`OpenAI request failed with status ${response.status}`);
+  let response: Response | null = null;
+  const maxAttempts = 4;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      },
+      body: requestBody,
+    });
+
+    if (response.ok) {
+      break;
+    }
+
+    if (response.status !== 429 || attempt === maxAttempts) {
+      break;
+    }
+
+    await sleep(getRetryDelayMs(response, attempt));
+  }
+
+  if (!response?.ok) {
+    const status = response?.status ?? "unknown";
+    throw new Error(`OpenAI request failed with status ${status}`);
   }
 
   const payload = (await response.json()) as {
@@ -217,6 +234,22 @@ async function generateWithOpenAi(
     evidence: buildEvidence(input.reviews),
     isEditorialOverride: false,
   };
+}
+
+function getRetryDelayMs(response: Response, attempt: number): number {
+  const retryAfterHeader = response.headers.get("retry-after");
+  const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : Number.NaN;
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return retryAfterSeconds * 1000;
+  }
+
+  return Math.min(12_000, 1_500 * 2 ** (attempt - 1));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
 }
 
 function buildHeuristicSummary(input: GenerateReleaseReviewSummaryInput & { reviews: ReviewSummaryInput[] }): ReleaseAiReviewSummary {
