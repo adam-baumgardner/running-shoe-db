@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CompareSelector } from "@/components/compare-selector";
 import { getCatalogCards, getComparisonPageData } from "@/lib/server/catalog";
 
 interface ComparePageProps {
@@ -20,6 +21,8 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
   const releaseOptions = catalog.map((shoe) => ({
     id: shoe.id,
     label: `${shoe.brand} ${shoe.release}`,
+    detail: `${shoe.category} · ${shoe.releaseYear ?? "Year TBD"} · ${shoe.isPlated ? "Plated" : "Non-plated"}`,
+    searchLabel: `${shoe.brand} ${shoe.release}${shoe.releaseYear ? ` (${shoe.releaseYear})` : ""}`,
   }));
 
   return (
@@ -27,40 +30,28 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       <section className="hero">
         <div>
           <p className="eyebrow">Compare</p>
-          <h1>Comparison should answer buying questions in minutes.</h1>
+          <h1>Comparison should narrow the shortlist, not create a new one.</h1>
           <p className="hero-copy">
-            Pick up to four models. The first pass is built around the dimensions runners usually
-            care about first: usage, plate, weight, stack, drop, and review signal.
+            Search for the exact releases you want to stack up. The comparison view keeps the focus
+            on the details that actually separate buying decisions: use case, plate, geometry,
+            weight, and review signal.
           </p>
         </div>
       </section>
 
-      <section className="filter-shell">
-        <form className="compare-picker" action="/compare">
-          {catalog.map((shoe) => {
-            const checked = selectedReleaseIds.includes(shoe.id);
-
-            return (
-              <label key={shoe.id} className="compare-option">
-                <input defaultChecked={checked} name="release" type="checkbox" value={shoe.id} />
-                <span>
-                  {shoe.brand} {shoe.release}
-                </span>
-              </label>
-            );
-          })}
-          <div className="filter-actions">
-            <button className="button-primary" type="submit">
-              Update comparison
-            </button>
-            <Link className="button-secondary" href="/compare">
-              Reset
-            </Link>
-          </div>
-        </form>
-      </section>
+      <CompareSelector options={releaseOptions} selectedIds={selectedReleaseIds} />
 
       <section className="compare-grid" aria-label="Comparison results">
+        {!selectedRows.length ? (
+          <article className="detail-panel compare-empty-state" style={{ gridColumn: "1 / -1" }}>
+            <p className="feature-kicker">Start Here</p>
+            <h2>Pick two releases to generate a real comparison.</h2>
+            <p className="catalog-copy">
+              The comparison view works best when you enter the exact versions you are deciding
+              between. Start with two, then add a third only if it helps clarify the choice.
+            </p>
+          </article>
+        ) : null}
         {comparison.narrative.overview ? (
           <article className="detail-panel" style={{ gridColumn: "1 / -1" }}>
             <p className="feature-kicker">AI Compare</p>
@@ -117,7 +108,12 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
             <form action="/compare" className="compare-slot-form">
               {selectedReleaseIds.map((releaseId, index) =>
                 releaseId === shoe.id ? null : (
-                  <input key={`${shoe.id}-${releaseId}-${index}`} name="release" type="hidden" value={releaseId} />
+                  <input
+                    key={`${shoe.id}-${releaseId}-${index}`}
+                    name="release"
+                    type="hidden"
+                    value={releaseId}
+                  />
                 ),
               )}
               <label className="filter-field">

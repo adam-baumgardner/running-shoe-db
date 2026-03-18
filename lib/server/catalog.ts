@@ -1107,7 +1107,7 @@ export async function getComparisonPageData(selectedSlugs: string[]): Promise<Co
 export async function getComparisonRows(selectedReleaseIds: string[]): Promise<ComparisonRow[]> {
   const releaseIds = selectedReleaseIds.filter(Boolean).slice(0, 4);
   if (!releaseIds.length) {
-    return buildFallbackComparison(buildFallbackCatalog().slice(0, 3));
+    return [];
   }
 
   if (!process.env.DATABASE_URL) {
