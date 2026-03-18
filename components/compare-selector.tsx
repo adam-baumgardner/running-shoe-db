@@ -33,8 +33,6 @@ export function CompareSelector({ options, selectedIds }: CompareSelectorProps) 
     .filter((value): value is string => Boolean(value));
 
   const filteredOptions = getFilteredOptions(options, query, resolvedSelectedIds);
-  const activeSlot = activeSlotIndex === null ? null : slots[activeSlotIndex] ?? null;
-
   function openSlot(index: number) {
     setActiveSlotIndex(index);
     const selectedId = slots[index]?.selectedId;
@@ -140,7 +138,57 @@ export function CompareSelector({ options, selectedIds }: CompareSelectorProps) 
               tabIndex={0}
             >
               <span className="compare-slot-label">Shoe #{index + 1}</span>
-              {option ? (
+              {isActive ? (
+                <div
+                  className="compare-search-panel compare-search-panel--inline"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="compare-search-panel-head">
+                    <div>
+                      <p className="feature-kicker">Search</p>
+                      <h3>Shoe #{index + 1}</h3>
+                    </div>
+                    <button
+                      className="text-link text-link--compact"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setActiveSlotIndex(null);
+                        setQuery("");
+                      }}
+                      type="button"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <input
+                    autoFocus
+                    className="compare-slot-input"
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Try Endorphin, Pegasus, Speedgoat, Vaporfly..."
+                    type="search"
+                    value={query}
+                  />
+                  <div className="compare-search-results" role="listbox">
+                    {filteredOptions.map((resultOption) => (
+                      <button
+                        className="compare-search-result"
+                        key={resultOption.id}
+                        onClick={() => selectOption(resultOption.id)}
+                        type="button"
+                      >
+                        <strong>{resultOption.label}</strong>
+                        <span>{resultOption.detail}</span>
+                      </button>
+                    ))}
+                    {!filteredOptions.length ? (
+                      <div className="compare-search-empty">
+                        <strong>No matching shoes yet.</strong>
+                        <span>Try a broader brand, model, or release-year search.</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ) : option ? (
                 <>
                   <strong>{option.label}</strong>
                   <span className="compare-slot-hint">{option.detail}</span>
@@ -196,44 +244,6 @@ export function CompareSelector({ options, selectedIds }: CompareSelectorProps) 
           Reset
         </a>
       </div>
-
-      {activeSlot ? (
-        <div className="compare-search-panel">
-          <div className="compare-search-panel-head">
-            <div>
-              <p className="feature-kicker">Search</p>
-              <h3>Shoe #{activeSlotIndex !== null ? activeSlotIndex + 1 : 1}</h3>
-            </div>
-          </div>
-          <input
-            autoFocus
-            className="compare-slot-input"
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Try Endorphin, Pegasus, Speedgoat, Vaporfly..."
-            type="search"
-            value={query}
-          />
-          <div className="compare-search-results" role="listbox">
-            {filteredOptions.map((option) => (
-              <button
-                className="compare-search-result"
-                key={option.id}
-                onClick={() => selectOption(option.id)}
-                type="button"
-              >
-                <strong>{option.label}</strong>
-                <span>{option.detail}</span>
-              </button>
-            ))}
-            {!filteredOptions.length ? (
-              <div className="compare-search-empty">
-                <strong>No matching shoes yet.</strong>
-                <span>Try a broader brand, model, or release-year search.</span>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
     </section>
   );
 }
