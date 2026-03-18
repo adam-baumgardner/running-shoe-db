@@ -1854,12 +1854,13 @@ function buildReviewIntelligence(
   const reviewCount = reviews.length;
   const sourceCount = new Set(reviews.map((review) => `${review.sourceType}:${review.sourceName}`)).size;
   const evidenceCount = aiReviewSummary?.evidence.length ?? Math.min(reviewCount, 6);
+  const fallbackInsights = buildFallbackReviewInsights(reviews);
   const ratingScore = weightedAverage(
     reviews
       .filter((review) => review.scoreNormalized100 !== null)
       .map((review) => ({
         value: review.scoreNormalized100 as number,
-        weight: getSourceWeight(review.sourceType),
+        weight: getReviewWeight(review),
       })),
   ) ?? averageReviewScore;
   const editorialScore = weightedAverage(
@@ -1867,7 +1868,7 @@ function buildReviewIntelligence(
       .filter((review) => review.sourceType === "editorial" && review.scoreNormalized100 !== null)
       .map((review) => ({
         value: review.scoreNormalized100 as number,
-        weight: getSourceWeight(review.sourceType),
+        weight: getReviewWeight(review),
       })),
   );
   const communityScore = weightedAverage(
@@ -1877,13 +1878,13 @@ function buildReviewIntelligence(
         value:
           review.scoreNormalized100 ??
           sentimentToScore(review.sentiment ?? aiReviewSummary?.overallSentiment ?? "mixed"),
-        weight: getSourceWeight(review.sourceType),
+        weight: getReviewWeight(review),
       })),
   );
   const sentimentScore = weightedAverage(
     reviews.map((review) => ({
       value: sentimentToScore(review.sentiment ?? aiReviewSummary?.overallSentiment ?? "mixed"),
-      weight: getSourceWeight(review.sourceType),
+      weight: getReviewWeight(review),
     })),
   ) ?? (aiReviewSummary ? aiSummarySentimentScore(aiReviewSummary) : null);
   const confidence = deriveConfidence(
@@ -1920,11 +1921,13 @@ function buildReviewIntelligence(
       sourceCount,
       reviewCount,
     ),
-    buyerSignal: aiReviewSummary?.buyerSignal ?? null,
-    consensusPoints: aiReviewSummary?.consensusPoints.slice(0, 3) ?? [],
-    debates: aiReviewSummary?.debates.slice(0, 3) ?? [],
-    positives: aiReviewSummary?.pros.slice(0, 2) ?? [],
-    concerns: aiReviewSummary?.cons.slice(0, 2) ?? [],
+    buyerSignal:
+      aiReviewSummary?.buyerSignal ??
+      buildFallbackBuyerSignal(compositeScore === null ? null : Math.round(compositeScore), confidence, agreement),
+    consensusPoints: aiReviewSummary?.consensusPoints.slice(0, 3) ?? fallbackInsights.consensusPoints,
+    debates: aiReviewSummary?.debates.slice(0, 3) ?? fallbackInsights.debates,
+    positives: aiReviewSummary?.pros.slice(0, 2) ?? fallbackInsights.positives,
+    concerns: aiReviewSummary?.cons.slice(0, 2) ?? fallbackInsights.concerns,
   };
 }
 
@@ -2005,6 +2008,62 @@ function buildChannelSummary(channel: "Editorial" | "Community", score: number |
   return `${channel} sentiment reads ${tone}.`;
 }
 
+function buildFallbackBuyerSignal(
+  compositeScore: number | null,
+  confidence: ReviewConfidence,
+  agreement: ReviewIntelligence["agreement"],
+) {
+  if (compositeScore === null) {
+    return "Buyer signal is still forming.";
+  }
+
+  const tone =
+    compositeScore >= 88 ? "Broadly positive"
+    : compositeScore >= 80 ? "Positive"
+    : compositeScore >= 72 ? "Mixed-positive"
+    : "Mixed";
+
+  return `${tone} buyer signal with ${confidence} confidence and ${agreement} reviewer agreement.`;
+}
+
+function buildFallbackReviewInsights(reviews: ShoeDetail["reviews"]) {
+  if (!reviews.length) {
+    return {
+      positives: [] as string[],
+      concerns: [] as string[],
+      consensusPoints: [] as string[],
+      debates: [] as string[],
+    };
+  }
+
+  const reconciliation = reconcileReviewEvidence(reviews, null);
+  const positives = reconciliation.themes
+    .filter((theme) => theme.dominantSentiment === "positive" && !theme.hasContradiction)
+    .slice(0, 2)
+    .map((theme) => `${theme.label} trends positive.`);
+  const concerns = reconciliation.themes
+    .filter((theme) => theme.dominantSentiment === "negative" || theme.hasContradiction)
+    .slice(0, 2)
+    .map((theme) =>
+      theme.hasContradiction ? `${theme.label} feedback is mixed.` : `${theme.label} is the main concern.`,
+    );
+  const consensusPoints = reconciliation.themes
+    .filter((theme) => !theme.hasContradiction)
+    .slice(0, 3)
+    .map((theme) => `${theme.label} ${theme.dominantSentiment === "positive" ? "leans positive" : "is mixed"}.`);
+  const debates = reconciliation.themes
+    .filter((theme) => theme.hasContradiction)
+    .slice(0, 3)
+    .map((theme) => `${theme.label} is contested across sources.`);
+
+  return {
+    positives,
+    concerns,
+    consensusPoints,
+    debates,
+  };
+}
+
 function deriveConfidence(
   reviewCount: number,
   sourceCount: number,
@@ -2048,12 +2107,6 @@ function sentimentToScore(sentiment: ReviewSentiment) {
   if (sentiment === "positive") return 86;
   if (sentiment === "negative") return 48;
   return 69;
-}
-
-function getSourceWeight(sourceType: "editorial" | "reddit" | "user") {
-  if (sourceType === "editorial") return 1;
-  if (sourceType === "user") return 0.8;
-  return 0.7;
 }
 
 function weightedAverage(values: Array<{ value: number; weight: number }>) {
