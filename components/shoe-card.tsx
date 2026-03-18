@@ -11,19 +11,45 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
 
   return (
     <article className="catalog-row">
+      <div className="catalog-row-topline">
+        <p className="feature-kicker">{shoe.brand}</p>
+        <span className={`catalog-row-status ${shoe.isCurrent ? "catalog-row-status--latest" : ""}`}>
+          {shoe.isCurrent ? "Latest release" : "Past release"}
+        </span>
+      </div>
       <div className="catalog-row-primary">
         <div className="catalog-row-title">
-          <p className="feature-kicker">{shoe.brand}</p>
           <h2>
             <Link href={familyHref}>
-              {shoe.model} <span className="detail-muted">{shoe.release}</span>
+              {shoe.model}
             </Link>
           </h2>
+          <div className="detail-chip-row">
+            <span className="pill">{shoe.release}</span>
+            <span className="pill">{shoe.releaseYear ?? "Year pending"}</span>
+          </div>
         </div>
-        <p className="catalog-copy">{shoe.usageSummary ?? shoe.rideProfile}</p>
+        <div className="catalog-row-summary">
+          <p className="catalog-copy">{shoe.usageSummary ?? shoe.rideProfile}</p>
+        </div>
+        <div className="catalog-row-actions">
+          <Link className="text-link text-link--compact" href={familyHref}>
+            Shoe page
+          </Link>
+          <Link className="text-link text-link--compact" href={releaseHref}>
+            Release detail
+          </Link>
+          <Link className="text-link text-link--cta text-link--compact" href={`/compare?release=${shoe.id}`}>
+            Compare
+          </Link>
+        </div>
       </div>
 
       <dl className="catalog-row-metrics" aria-label={`${shoe.brand} ${shoe.release} specs`}>
+        <div>
+          <dt>Year</dt>
+          <dd>{shoe.releaseYear ?? "Pending"}</dd>
+        </div>
         <div>
           <dt>Category</dt>
           <dd>{shoe.category}</dd>
@@ -73,19 +99,6 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
           <dd>{shoe.reviewCount}</dd>
         </div>
       </dl>
-
-      <div className="catalog-row-actions">
-        {shoe.isCurrent ? <span className="pill">Latest release</span> : <span className="pill">Past release</span>}
-        <Link className="text-link" href={familyHref}>
-          Open shoe page
-        </Link>
-        <Link className="text-link" href={releaseHref}>
-          Open latest release
-        </Link>
-        <Link className="text-link text-link--cta" href={`/compare?release=${shoe.id}`}>
-          Compare
-        </Link>
-      </div>
     </article>
   );
 }

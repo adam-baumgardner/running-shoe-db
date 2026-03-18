@@ -8,6 +8,8 @@ interface ShoesPageProps {
     sort?: string;
     direction?: string;
     brand?: string;
+    minReleaseYear?: string;
+    maxReleaseYear?: string;
     category?: string;
     terrain?: string;
     stability?: string;

@@ -43,6 +43,8 @@ export interface CatalogFilters {
   sort?: string;
   direction?: string;
   brand?: string;
+  minReleaseYear?: string;
+  maxReleaseYear?: string;
   category?: string;
   terrain?: string;
   stability?: string;
@@ -1940,6 +1942,7 @@ function filterCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
     }
 
     if (filters.brand && shoe.brand !== filters.brand) return false;
+    if (!matchesMinMax(shoe.releaseYear, filters.minReleaseYear, filters.maxReleaseYear)) return false;
     if (filters.category && shoe.category !== filters.category) return false;
     if (filters.terrain && shoe.terrain !== filters.terrain) return false;
     if (filters.stability && shoe.stability !== filters.stability) return false;
@@ -1985,6 +1988,9 @@ function sortCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
       case "price":
         delta = compareNullableNumber(left.priceUsd, right.priceUsd);
         break;
+      case "release-year":
+        delta = compareNullableNumber(left.releaseYear, right.releaseYear);
+        break;
       case "weight":
         delta = compareNullableNumber(left.weightOz, right.weightOz);
         break;
@@ -2029,6 +2035,7 @@ function buildActiveFilterChips(filters: CatalogFilters) {
 
   pushIfValue("q", "Search", filters.q);
   pushIfValue("brand", "Brand", filters.brand);
+  pushRangeChip(chips, "release-year", "Release year", filters.minReleaseYear, filters.maxReleaseYear);
   pushIfValue("category", "Category", filters.category);
   pushIfValue("terrain", "Terrain", filters.terrain);
   pushIfValue("stability", "Stability", filters.stability);
