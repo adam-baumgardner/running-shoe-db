@@ -2362,7 +2362,7 @@ export const seedReviewAuthors: SeedReviewAuthor[] = [
   },
 ];
 
-export const seedReviews: SeedReview[] = [
+const baseSeedReviews: SeedReview[] = [
   {
     releaseKey: "nike-pegasus:Pegasus 40",
     sourceSlug: "reddit-running-shoe-geeks",
@@ -3444,6 +3444,62 @@ export const seedReviews: SeedReview[] = [
     publishedAt: "2025-01-29T00:00:00.000Z",
   },
 ];
+
+const recentReviewDateOverrides: Record<string, string> = {
+  "nike-pegasus:Pegasus 41:roadtrailrun": "2026-01-14T00:00:00.000Z",
+  "nike-vomero:Vomero 18:doctors-of-running": "2026-02-11T00:00:00.000Z",
+  "nike-alphafly:Alphafly 3:runrepeat": "2026-02-23T00:00:00.000Z",
+  "saucony-endorphin-speed:Endorphin Speed 4:believe-in-the-run": "2026-01-28T00:00:00.000Z",
+  "saucony-triumph:Triumph 22:roadtrailrun": "2026-02-04T00:00:00.000Z",
+  "saucony-ride:Ride 18:runrepeat": "2026-01-21T00:00:00.000Z",
+  "saucony-guide:Guide 18:doctors-of-running": "2026-02-06T00:00:00.000Z",
+  "brooks-ghost:Ghost 17:roadtrailrun": "2026-03-02T00:00:00.000Z",
+  "brooks-glycerin:Glycerin 22:believe-in-the-run": "2026-02-18T00:00:00.000Z",
+  "asics-gel-nimbus:GEL-Nimbus 27:runrepeat": "2026-01-30T00:00:00.000Z",
+  "asics-novablast:Novablast 5:doctors-of-running": "2026-01-17T00:00:00.000Z",
+  "asics-gel-kayano:GEL-Kayano 31:roadtrailrun": "2026-02-13T00:00:00.000Z",
+  "asics-superblast:Superblast 2:believe-in-the-run": "2026-01-24T00:00:00.000Z",
+  "new-balance-1080:Fresh Foam X 1080v14:believe-in-the-run": "2026-02-09T00:00:00.000Z",
+  "new-balance-rebel:FuelCell Rebel v4:runrepeat": "2026-01-19T00:00:00.000Z",
+  "new-balance-more:Fresh Foam X More v5:doctors-of-running": "2026-02-05T00:00:00.000Z",
+  "hoka-clifton:Clifton 10:roadtrailrun": "2026-03-05T00:00:00.000Z",
+  "hoka-bondi:Bondi 9:believe-in-the-run": "2026-02-26T00:00:00.000Z",
+  "hoka-cielo-x1:Cielo X1 2.0:runrepeat": "2026-03-07T00:00:00.000Z",
+  "altra-lone-peak:Lone Peak 9:reddit-running-shoe-geeks": "2026-02-15T00:00:00.000Z",
+  "mizuno-wave-rider:Wave Rider 28:roadtrailrun": "2026-01-22T00:00:00.000Z",
+  "puma-deviate-nitro:Deviate NITRO 3:runrepeat": "2026-02-03T00:00:00.000Z",
+  "adidas-adizero-boston:Adizero Boston 13:roadtrailrun": "2026-01-26T00:00:00.000Z",
+  "adidas-adizero-adios-pro:Adizero Adios Pro 4:believe-in-the-run": "2026-02-20T00:00:00.000Z",
+  "salomon-aero-glide:Aero Glide 3:doctors-of-running": "2026-02-02T00:00:00.000Z",
+  "hoka-speedgoat:Speedgoat 6:roadtrailrun": "2026-02-12T00:00:00.000Z",
+  "saucony-peregrine:Peregrine 15:believe-in-the-run": "2026-01-27T00:00:00.000Z",
+  "nike-pegasus-trail:Pegasus Trail 5:runrepeat": "2026-01-25T00:00:00.000Z",
+  "asics-trabuco-max:Trabuco Max 4:roadtrailrun": "2026-02-01T00:00:00.000Z",
+  "adidas-terrex-agravic-speed-ultra:Terrex Agravic Speed Ultra 2:roadtrailrun": "2026-02-16T00:00:00.000Z",
+  "salomon-speedcross:Speedcross 6:runrepeat": "2026-01-18T00:00:00.000Z",
+  "saucony-tempus:Tempus 2:runrepeat": "2026-02-10T00:00:00.000Z",
+  "asics-gt-2000:GT-2000 13:roadtrailrun": "2026-01-29T00:00:00.000Z",
+  "new-balance-860:Fresh Foam X 860v14:roadtrailrun": "2026-02-08T00:00:00.000Z",
+  "hoka-arahi:Arahi 8:doctors-of-running": "2026-02-22T00:00:00.000Z",
+  "hoka-gaviota:Gaviota 6:roadtrailrun": "2026-03-01T00:00:00.000Z",
+  "mizuno-wave-inspire:Wave Inspire 21:roadtrailrun": "2026-02-17T00:00:00.000Z",
+  "nike-vaporfly:Vaporfly 4:roadtrailrun": "2026-03-08T00:00:00.000Z",
+  "saucony-endorphin-pro:Endorphin Pro 4:runrepeat": "2026-02-19T00:00:00.000Z",
+  "asics-metaspeed-sky:Metaspeed Sky Paris:roadtrailrun": "2026-02-25T00:00:00.000Z",
+  "new-balance-sc-elite:FuelCell SuperComp Elite v4:doctors-of-running": "2026-02-14T00:00:00.000Z",
+  "hoka-rocket-x:Rocket X 3:roadtrailrun": "2026-02-24T00:00:00.000Z",
+  "brooks-hyperion-elite:Hyperion Elite 4 PB:roadtrailrun": "2026-03-03T00:00:00.000Z",
+  "puma-fast-r-nitro-elite:FAST-R NITRO Elite 3:runrepeat": "2026-02-07T00:00:00.000Z",
+};
+
+export const seedReviews: SeedReview[] = baseSeedReviews.map((review) => {
+  const overrideKey = `${review.releaseKey}:${review.sourceSlug}`;
+
+  return {
+    ...review,
+    publishedAt: recentReviewDateOverrides[overrideKey] ?? review.publishedAt,
+  };
+});
 
 export const seedCrawlSources: SeedCrawlSource[] = [
   {
