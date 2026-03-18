@@ -6,6 +6,9 @@ const aiSummarySchema = z.object({
   overview: z.string().min(1).max(500),
   overallSentiment: z.enum(["positive", "mixed", "negative"]),
   confidence: z.enum(["low", "medium", "high"]),
+  editorialSentiment: z.enum(["positive", "mixed", "negative"]).nullable(),
+  communitySentiment: z.enum(["positive", "mixed", "negative"]).nullable(),
+  sourceAlignment: z.enum(["aligned", "mixed", "divergent"]),
   buyerSignal: z.string().min(1).max(220).nullable(),
   pros: z.array(z.string().min(1).max(120)).max(4),
   cons: z.array(z.string().min(1).max(120)).max(4),
@@ -83,7 +86,7 @@ async function generateWithOpenAi(
             {
               type: "input_text",
               text:
-                "You summarize running shoe reviews and community discussion. Use only the supplied evidence. Produce concise, factual buyer guidance. Distinguish broad consensus from contested points. Do not invent specs or opinions.",
+                "You summarize running shoe reviews and community discussion. Use only the supplied evidence. Produce concise, factual buyer guidance. Distinguish broad consensus from contested points. Explicitly judge editorial sentiment, community sentiment, and whether those two reads align. Do not invent specs or opinions.",
             },
           ],
         },
@@ -127,6 +130,9 @@ async function generateWithOpenAi(
               overview: { type: "string" },
               overallSentiment: { type: "string", enum: ["positive", "mixed", "negative"] },
               confidence: { type: "string", enum: ["low", "medium", "high"] },
+              editorialSentiment: { type: ["string", "null"], enum: ["positive", "mixed", "negative", null] },
+              communitySentiment: { type: ["string", "null"], enum: ["positive", "mixed", "negative", null] },
+              sourceAlignment: { type: "string", enum: ["aligned", "mixed", "divergent"] },
               buyerSignal: { type: ["string", "null"] },
               pros: {
                 type: "array",
@@ -163,6 +169,9 @@ async function generateWithOpenAi(
               "overview",
               "overallSentiment",
               "confidence",
+              "editorialSentiment",
+              "communitySentiment",
+              "sourceAlignment",
               "buyerSignal",
               "pros",
               "cons",
@@ -246,6 +255,12 @@ function buildHeuristicSummary(input: GenerateReleaseReviewSummaryInput & { revi
     overview: buildOverview(input, overallSentiment, confidence, pros, cons),
     overallSentiment,
     confidence,
+    editorialSentiment: getChannelSentiment(input.reviews.filter((review) => review.sourceType === "editorial"), overallSentiment),
+    communitySentiment: getChannelSentiment(input.reviews.filter((review) => review.sourceType !== "editorial"), overallSentiment),
+    sourceAlignment: deriveSourceAlignment(
+      getChannelSentiment(input.reviews.filter((review) => review.sourceType === "editorial"), overallSentiment),
+      getChannelSentiment(input.reviews.filter((review) => review.sourceType !== "editorial"), overallSentiment),
+    ),
     buyerSignal: buildBuyerSignal(input, overallSentiment, confidence),
     pros: withFallback(pros, overallSentiment === "negative" ? [] : ["Promising overall ride signal across current sources."]),
     cons: withFallback(cons, overallSentiment === "positive" ? ["Tradeoffs are still limited in the current review set."] : ["Mixed feedback across the current review set."]),
@@ -401,6 +416,46 @@ function buildBuyerSignal(
         : "Mixed";
 
   return `${tone} buyer signal for ${input.category.toLowerCase()} use with ${confidence} confidence.`;
+}
+
+function getChannelSentiment(reviews: ReviewSummaryInput[], fallback: ReviewSentiment) {
+  if (!reviews.length) {
+    return null;
+  }
+
+  const weighted = {
+    positive: 0,
+    mixed: 0,
+    negative: 0,
+  };
+
+  for (const review of reviews) {
+    weighted[review.sentiment ?? fallback] += getReviewWeight(review);
+  }
+
+  return getDominantSentiment(weighted);
+}
+
+function deriveSourceAlignment(
+  editorialSentiment: ReviewSentiment | null,
+  communitySentiment: ReviewSentiment | null,
+) {
+  if (!editorialSentiment || !communitySentiment) {
+    return "mixed" as const;
+  }
+
+  if (editorialSentiment === communitySentiment) {
+    return "aligned" as const;
+  }
+
+  if (
+    (editorialSentiment === "positive" && communitySentiment === "negative")
+    || (editorialSentiment === "negative" && communitySentiment === "positive")
+  ) {
+    return "divergent" as const;
+  }
+
+  return "mixed" as const;
 }
 
 function buildConsensusPoints(terms: string[], overallSentiment: ReviewSentiment) {

@@ -11,6 +11,9 @@ export interface ReleaseAiReviewSummary {
   overview: string;
   overallSentiment: ReviewSentiment;
   confidence: ReviewConfidence;
+  editorialSentiment: ReviewSentiment | null;
+  communitySentiment: ReviewSentiment | null;
+  sourceAlignment: "aligned" | "mixed" | "divergent";
   buyerSignal: string | null;
   pros: string[];
   cons: string[];
@@ -121,6 +124,9 @@ export function getReleaseAiReviewSummary(metadata: unknown): ReleaseAiReviewSum
     overview: override.overview ?? generated.overview,
     overallSentiment: override.overallSentiment ?? generated.overallSentiment,
     confidence: override.confidence ?? generated.confidence,
+    editorialSentiment: generated.editorialSentiment,
+    communitySentiment: generated.communitySentiment,
+    sourceAlignment: generated.sourceAlignment,
     buyerSignal: generated.buyerSignal,
     pros: override.pros.length ? override.pros : generated.pros,
     cons: override.cons.length ? override.cons : generated.cons,
@@ -150,6 +156,12 @@ export function getStoredReleaseAiReviewSummary(metadata: unknown): ReleaseAiRev
     overview,
     overallSentiment,
     confidence,
+    editorialSentiment: readSentiment(record.editorialSentiment),
+    communitySentiment: readSentiment(record.communitySentiment),
+    sourceAlignment:
+      record.sourceAlignment === "aligned" || record.sourceAlignment === "mixed" || record.sourceAlignment === "divergent"
+        ? record.sourceAlignment
+        : "mixed",
     buyerSignal: typeof record.buyerSignal === "string" ? record.buyerSignal : null,
     pros: readStringList(record.pros, 4),
     cons: readStringList(record.cons, 4),
