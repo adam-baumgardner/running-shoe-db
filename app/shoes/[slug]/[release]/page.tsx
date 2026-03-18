@@ -3,20 +3,23 @@ import Link from "next/link";
 import { getReleaseDetail, getShoeParentPageData } from "@/lib/server/catalog";
 
 interface ReleaseDetailPageProps {
-  params: { slug: string; release: string };
+  params: Promise<{ slug: string; release: string }>;
 }
 
 export default async function ReleaseDetailPage({ params }: ReleaseDetailPageProps) {
+  const resolvedParams = await params;
   const [shoe, parent] = await Promise.all([
-    getReleaseDetail(params.slug, params.release),
-    getShoeParentPageData(params.slug),
+    getReleaseDetail(resolvedParams.slug, resolvedParams.release),
+    getShoeParentPageData(resolvedParams.slug),
   ]);
 
   if (!shoe || !parent) {
     notFound();
   }
 
-  const currentReleaseIndex = parent.releases.findIndex((release) => release.releaseSlug === params.release);
+  const currentReleaseIndex = parent.releases.findIndex(
+    (release) => release.releaseSlug === resolvedParams.release,
+  );
   const currentReleaseId = currentReleaseIndex >= 0 ? parent.releases[currentReleaseIndex]?.id ?? null : null;
   const newerRelease = currentReleaseIndex > 0 ? parent.releases[currentReleaseIndex - 1] : null;
   const olderRelease =
@@ -81,7 +84,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           {parent.releases.map((release) => (
             <div
               className={`release-rail-item ${
-                release.releaseSlug === params.release ? "release-rail-item--active" : ""
+                release.releaseSlug === resolvedParams.release ? "release-rail-item--active" : ""
               }`}
               key={release.id}
             >

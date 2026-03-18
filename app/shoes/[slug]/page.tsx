@@ -2,11 +2,11 @@ import { notFound } from "next/navigation";
 import { getShoeParentPageData } from "@/lib/server/catalog";
 
 interface ShoeDetailPageProps {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }
 
 export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
-  const { slug } = params;
+  const { slug } = await params;
   const shoe = await getShoeParentPageData(slug);
 
   if (!shoe) {
