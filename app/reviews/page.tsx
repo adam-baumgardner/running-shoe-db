@@ -32,6 +32,8 @@ export default async function ReviewsPage() {
                 <span className="pill">{item.category}</span>
                 {item.sentiment ? <span className="pill">{item.sentiment}</span> : null}
                 {item.reviewScore ? <span className="pill">Review score {item.reviewScore}/100</span> : null}
+                {item.consensusPoints.length ? <span className="pill">Consensus surfaced</span> : null}
+                {item.debates.length ? <span className="pill">Debates surfaced</span> : null}
                 {item.publishedAt ? <span className="pill">{item.publishedAt}</span> : null}
               </div>
               <div className="review-feed-header">

@@ -125,6 +125,18 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           {shoe.aiReviewSummary ? (
             <dl className="spec-grid">
               <div>
+                <dt>Editorial sentiment</dt>
+                <dd>{shoe.aiReviewSummary.editorialSentiment ?? "Pending"}</dd>
+              </div>
+              <div>
+                <dt>Community sentiment</dt>
+                <dd>{shoe.aiReviewSummary.communitySentiment ?? "Pending"}</dd>
+              </div>
+              <div>
+                <dt>Source alignment</dt>
+                <dd>{shoe.aiReviewSummary.sourceAlignment}</dd>
+              </div>
+              <div>
                 <dt>Pros</dt>
                 <dd>{shoe.aiReviewSummary.pros.join(" ") || "Pending"}</dd>
               </div>

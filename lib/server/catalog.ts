@@ -226,6 +226,9 @@ export interface ShoeDetail {
     overview: string;
     overallSentiment: "positive" | "mixed" | "negative";
     confidence: "low" | "medium" | "high";
+    editorialSentiment: "positive" | "mixed" | "negative" | null;
+    communitySentiment: "positive" | "mixed" | "negative" | null;
+    sourceAlignment: "aligned" | "mixed" | "divergent";
     buyerSignal: string | null;
     pros: string[];
     cons: string[];
@@ -1874,7 +1877,7 @@ function buildReviewIntelligence(
         weight: getReviewWeight(review),
       })),
   );
-  const editorialSentiment = getWeightedSentiment(
+  const derivedEditorialSentiment = getWeightedSentiment(
     reviews.filter((review) => review.sourceType === "editorial"),
     aiReviewSummary,
   );
@@ -1888,7 +1891,7 @@ function buildReviewIntelligence(
         weight: getReviewWeight(review),
       })),
   );
-  const communitySentiment = getWeightedSentiment(
+  const derivedCommunitySentiment = getWeightedSentiment(
     reviews.filter((review) => review.sourceType !== "editorial"),
     aiReviewSummary,
   );
@@ -1905,6 +1908,9 @@ function buildReviewIntelligence(
     reviews.map((review) => review.sentiment),
   );
   const agreement = deriveAgreement(reviews.map((review) => review.sentiment));
+  const editorialSentiment = aiReviewSummary?.editorialSentiment ?? derivedEditorialSentiment;
+  const communitySentiment = aiReviewSummary?.communitySentiment ?? derivedCommunitySentiment;
+  const sourceAlignment = aiReviewSummary?.sourceAlignment ?? deriveSourceAlignment(editorialSentiment, communitySentiment);
   const compositeScore = weightedAverage(
     [
       ratingScore !== null ? { value: ratingScore, weight: 0.55 } : null,
@@ -1920,7 +1926,7 @@ function buildReviewIntelligence(
     communityScore: communityScore === null ? null : Math.round(communityScore),
     editorialSentiment,
     communitySentiment,
-    sourceAlignment: deriveSourceAlignment(editorialSentiment, communitySentiment),
+    sourceAlignment,
     editorialSummary: buildChannelSummary("Editorial", editorialScore, editorialSentiment),
     communitySummary: buildChannelSummary("Community", communityScore, communitySentiment),
     confidence,
@@ -1968,9 +1974,9 @@ function buildAggregateReviewIntelligence(
     sentimentScore: sentimentScore === null ? null : Math.round(sentimentScore),
     editorialScore: null,
     communityScore: null,
-    editorialSentiment: null,
-    communitySentiment: null,
-    sourceAlignment: "mixed",
+    editorialSentiment: aiReviewSummary?.editorialSentiment ?? null,
+    communitySentiment: aiReviewSummary?.communitySentiment ?? null,
+    sourceAlignment: aiReviewSummary?.sourceAlignment ?? "mixed",
     editorialSummary: null,
     communitySummary: null,
     confidence,

@@ -128,6 +128,17 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
               ))}
             </div>
           ) : null}
+          <div className="detail-chip-row">
+            <span className="pill">
+              Editorial: {shoe.featuredRelease.reviewIntelligence.editorialSentiment ?? "pending"}
+            </span>
+            <span className="pill">
+              Community: {shoe.featuredRelease.reviewIntelligence.communitySentiment ?? "pending"}
+            </span>
+            <span className="pill">
+              Alignment: {shoe.featuredRelease.reviewIntelligence.sourceAlignment}
+            </span>
+          </div>
           {shoe.featuredRelease.reviewIntelligence.debates.length ? (
             <div className="detail-chip-row">
               {shoe.featuredRelease.reviewIntelligence.debates.map((debate) => (
