@@ -219,10 +219,13 @@ async function generateWithOpenAi(
     throw new Error(`OpenAI request failed with status ${status}`);
   }
 
-  const payload = (await response.json()) as {
-    output_text?: string;
-  };
-  const parsed = aiSummarySchema.parse(JSON.parse(payload.output_text ?? "{}"));
+  const payload = (await response.json()) as Record<string, unknown>;
+  const rawOutput = extractResponseText(payload);
+  if (!rawOutput) {
+    throw new Error(`OpenAI response did not include parsable text output: ${JSON.stringify(payload).slice(0, 1200)}`);
+  }
+
+  const parsed = aiSummarySchema.parse(JSON.parse(rawOutput));
 
   return {
     ...parsed,
@@ -234,6 +237,79 @@ async function generateWithOpenAi(
     evidence: buildEvidence(input.reviews),
     isEditorialOverride: false,
   };
+}
+
+function extractResponseText(payload: Record<string, unknown>): string | null {
+  const topLevelOutputText = typeof payload.output_text === "string" ? payload.output_text : null;
+  if (topLevelOutputText && topLevelOutputText.trim()) {
+    return extractJsonObject(topLevelOutputText);
+  }
+
+  const output = Array.isArray(payload.output) ? payload.output : [];
+  for (const item of output) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+
+    const content = Array.isArray((item as { content?: unknown }).content)
+      ? ((item as { content?: unknown }).content as unknown[])
+      : [];
+
+    for (const entry of content) {
+      if (!entry || typeof entry !== "object") {
+        continue;
+      }
+
+      const candidate = extractTextCandidate(entry as Record<string, unknown>);
+      if (candidate) {
+        return candidate;
+      }
+    }
+  }
+
+  return null;
+}
+
+function extractTextCandidate(entry: Record<string, unknown>): string | null {
+  const directText = typeof entry.text === "string" ? entry.text : null;
+  if (directText && directText.trim()) {
+    return extractJsonObject(directText);
+  }
+
+  const nestedText = entry.text;
+  if (nestedText && typeof nestedText === "object") {
+    const value = (nestedText as { value?: unknown }).value;
+    if (typeof value === "string" && value.trim()) {
+      return extractJsonObject(value);
+    }
+  }
+
+  const jsonValue = entry.json;
+  if (jsonValue && typeof jsonValue === "object") {
+    return JSON.stringify(jsonValue);
+  }
+
+  const argumentsValue = entry.arguments;
+  if (typeof argumentsValue === "string" && argumentsValue.trim()) {
+    return extractJsonObject(argumentsValue);
+  }
+
+  return null;
+}
+
+function extractJsonObject(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+    return trimmed;
+  }
+
+  const firstBrace = trimmed.indexOf("{");
+  const lastBrace = trimmed.lastIndexOf("}");
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    return trimmed.slice(firstBrace, lastBrace + 1);
+  }
+
+  return trimmed;
 }
 
 function getRetryDelayMs(response: Response, attempt: number): number {
