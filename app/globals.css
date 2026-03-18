@@ -226,6 +226,8 @@ a {
 .catalog-filter-panel {
   border: none;
   background: transparent;
+  display: grid;
+  gap: 0.8rem;
 }
 
 .catalog-filter-panel summary {
@@ -246,16 +248,20 @@ a {
   display: none;
 }
 
+.catalog-filter-panel--full {
+  align-items: end;
+}
+
 .catalog-filter-panel-body {
-  margin-top: 0.8rem;
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: 1rem;
   background: rgba(255, 248, 239, 0.58);
+  width: 100%;
 }
 
 .filter-grid--catalog {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .catalog-active-filters {

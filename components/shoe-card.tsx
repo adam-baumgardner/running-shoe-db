@@ -25,12 +25,14 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
             </Link>
           </h2>
           <div className="detail-chip-row">
-            <span className="pill">{shoe.release}</span>
+            <span className="pill">{shoe.usageSummary ?? shoe.category}</span>
             <span className="pill">{shoe.releaseYear ?? "Year pending"}</span>
           </div>
         </div>
         <div className="catalog-row-summary">
-          <p className="catalog-copy">{shoe.usageSummary ?? shoe.rideProfile}</p>
+          <p className="catalog-copy">
+            {shoe.release} · {shoe.foam ?? shoe.rideProfile}
+          </p>
         </div>
         <div className="catalog-row-actions">
           <Link className="text-link text-link--compact" href={familyHref}>
