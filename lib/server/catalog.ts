@@ -636,7 +636,7 @@ export async function getShoeParentPageData(slug: string): Promise<ShoeParentPag
         shoeSpecs.fitNotes,
         shoeSpecs.sourceNotes,
       )
-      .orderBy(desc(shoeReleases.releaseYear), desc(shoeReleases.releaseDate));
+      .orderBy(desc(shoeReleases.releaseYear), desc(shoeReleases.isCurrent), shoes.name);
 
     const featured = rows[0];
     if (!featured) {
