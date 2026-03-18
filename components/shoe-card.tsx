@@ -30,9 +30,7 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
           </div>
         </div>
         <div className="catalog-row-summary">
-          <p className="catalog-copy">
-            {shoe.release} · {shoe.foam ?? shoe.rideProfile}
-          </p>
+          <p className="catalog-copy">{shoe.foam ?? shoe.rideProfile}</p>
         </div>
         <div className="catalog-row-actions">
           <Link className="text-link text-link--compact" href={familyHref}>
