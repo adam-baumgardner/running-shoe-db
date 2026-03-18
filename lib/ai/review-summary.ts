@@ -225,7 +225,7 @@ async function generateWithOpenAi(
     throw new Error(`OpenAI response did not include parsable text output: ${JSON.stringify(payload).slice(0, 1200)}`);
   }
 
-  const parsed = aiSummarySchema.parse(JSON.parse(rawOutput));
+  const parsed = aiSummarySchema.parse(sanitizeAiSummaryCandidate(JSON.parse(rawOutput)));
 
   return {
     ...parsed,
@@ -310,6 +310,52 @@ function extractJsonObject(text: string): string {
   }
 
   return trimmed;
+}
+
+function sanitizeAiSummaryCandidate(candidate: unknown): unknown {
+  if (!candidate || typeof candidate !== "object") {
+    return candidate;
+  }
+
+  const record = candidate as Record<string, unknown>;
+  return {
+    ...record,
+    overview: sanitizeOptionalString(record.overview, 500),
+    buyerSignal: sanitizeNullableString(record.buyerSignal, 220),
+    pros: sanitizeStringArray(record.pros, 120, 4),
+    cons: sanitizeStringArray(record.cons, 120, 4),
+    bestFor: sanitizeStringArray(record.bestFor, 120, 4),
+    watchOuts: sanitizeStringArray(record.watchOuts, 120, 4),
+    consensusPoints: sanitizeStringArray(record.consensusPoints, 140, 4),
+    debates: sanitizeStringArray(record.debates, 140, 4),
+  };
+}
+
+function sanitizeOptionalString(value: unknown, maxLength: number): unknown {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  return value.trim().slice(0, maxLength);
+}
+
+function sanitizeNullableString(value: unknown, maxLength: number): unknown {
+  if (value === null) {
+    return null;
+  }
+
+  return sanitizeOptionalString(value, maxLength);
+}
+
+function sanitizeStringArray(value: unknown, maxLength: number, maxItems: number): unknown {
+  if (!Array.isArray(value)) {
+    return value;
+  }
+
+  return value
+    .slice(0, maxItems)
+    .map((entry) => (typeof entry === "string" ? entry.trim().slice(0, maxLength) : entry))
+    .filter((entry) => typeof entry !== "string" || entry.length > 0);
 }
 
 function getRetryDelayMs(response: Response, attempt: number): number {
