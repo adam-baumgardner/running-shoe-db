@@ -622,8 +622,8 @@ export default async function InternalPage() {
           <div className="editorial-table-head">Release</div>
           <div className="editorial-table-head">Status</div>
           <div className="editorial-table-head">Approved</div>
-          <div className="editorial-table-head">Editorial / Reddit / User</div>
-          <div className="editorial-table-head">Pending</div>
+          <div className="editorial-table-head">Sources</div>
+          <div className="editorial-table-head">Source Gaps</div>
 
           {data.releaseCoverage.map((release) => (
             <div className="editorial-row" key={release.releaseId}>
@@ -635,9 +635,20 @@ export default async function InternalPage() {
               </div>
               <div>{release.approvedReviewCount}</div>
               <div>
-                {release.editorialCount} / {release.redditCount} / {release.userCount}
+                <p className="detail-muted">
+                  {release.uniqueSourceCount} unique · {release.editorialCount} editorial / {release.redditCount} reddit /{" "}
+                  {release.userCount} user
+                </p>
+                <p className="detail-muted">
+                  {release.sourceNames.length ? release.sourceNames.join(", ") : "No approved sources yet"}
+                </p>
               </div>
-              <div>{release.pendingCount}</div>
+              <div>
+                <p className="detail-muted">
+                  {release.missingSourceNames.length ? release.missingSourceNames.join(", ") : "No active source gaps"}
+                </p>
+                <p className="detail-muted">Pending reviews: {release.pendingCount}</p>
+              </div>
             </div>
           ))}
         </div>

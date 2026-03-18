@@ -50,6 +50,7 @@ export async function runScheduledIngestion() {
     .select({
       id: crawlSources.id,
       importerKey: crawlSources.importerKey,
+      reviewSourceId: crawlSources.reviewSourceId,
       cadenceLabel: crawlSources.cadenceLabel,
       isActive: crawlSources.isActive,
     })
@@ -73,6 +74,7 @@ export async function runScheduledIngestion() {
       releaseId: shoeReleases.id,
       reviewId: reviews.id,
       reviewStatus: reviews.status,
+      sourceId: reviewSources.id,
       sourceType: reviewSources.sourceType,
     })
     .from(shoeReleases)
@@ -87,8 +89,6 @@ export async function runScheduledIngestion() {
     skippedReleases: [],
     runs: [],
   };
-
-  const prioritizedReleases = rankReleasesByCoverageGap(currentReleases, coverageRows);
 
   for (const source of sources) {
     const cadence = normalizeCadenceLabel(source.cadenceLabel);
@@ -126,6 +126,7 @@ export async function runScheduledIngestion() {
     }
 
     result.processedSources += 1;
+    const prioritizedReleases = rankReleasesByCoverageGap(currentReleases, coverageRows, source.reviewSourceId);
     const recentRuns = await db.query.crawlRuns.findMany({
       where: eq(crawlRuns.crawlSourceId, source.id),
       orderBy: desc(crawlRuns.createdAt),
@@ -243,12 +244,21 @@ function rankReleasesByCoverageGap(
     releaseId: string;
     reviewId: string | null;
     reviewStatus: "pending" | "approved" | "rejected" | "flagged" | null;
+    sourceId: string | null;
     sourceType: "editorial" | "reddit" | "user" | null;
   }>,
+  reviewSourceId: string,
 ) {
   const coverageMap = new Map<
     string,
-    { approved: number; editorial: number; reddit: number; pending: number }
+    {
+      approved: number;
+      editorial: number;
+      reddit: number;
+      pending: number;
+      approvedSourceIds: Set<string>;
+      pendingSourceIds: Set<string>;
+    }
   >();
 
   for (const release of releases) {
@@ -257,6 +267,8 @@ function rankReleasesByCoverageGap(
       editorial: 0,
       reddit: 0,
       pending: 0,
+      approvedSourceIds: new Set<string>(),
+      pendingSourceIds: new Set<string>(),
     });
   }
 
@@ -268,10 +280,16 @@ function rankReleasesByCoverageGap(
 
     if (row.reviewStatus === "pending") {
       coverage.pending += 1;
+      if (row.sourceId) {
+        coverage.pendingSourceIds.add(row.sourceId);
+      }
     }
 
     if (row.reviewStatus === "approved") {
       coverage.approved += 1;
+      if (row.sourceId) {
+        coverage.approvedSourceIds.add(row.sourceId);
+      }
       if (row.sourceType === "editorial") {
         coverage.editorial += 1;
       }
@@ -288,6 +306,8 @@ function rankReleasesByCoverageGap(
         editorial: 0,
         reddit: 0,
         pending: 0,
+        approvedSourceIds: new Set<string>(),
+        pendingSourceIds: new Set<string>(),
       };
 
       let priority = 0;
@@ -300,8 +320,19 @@ function rankReleasesByCoverageGap(
       if (coverage.reddit === 0) {
         priority += 35;
       }
+      if (!coverage.approvedSourceIds.has(reviewSourceId)) {
+        priority += 45;
+      }
+      if (coverage.approvedSourceIds.size < 2) {
+        priority += 20;
+      } else if (coverage.approvedSourceIds.size < 3) {
+        priority += 10;
+      }
       if (coverage.approved < 3) {
         priority += 20;
+      }
+      if (coverage.pendingSourceIds.has(reviewSourceId)) {
+        priority -= 10;
       }
       priority -= coverage.pending * 5;
 

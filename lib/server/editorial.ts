@@ -101,6 +101,9 @@ export interface EditorialDashboardData {
     redditCount: number;
     userCount: number;
     pendingCount: number;
+    uniqueSourceCount: number;
+    sourceNames: string[];
+    missingSourceNames: string[];
     coverageStatus: "healthy" | "thin" | "missing-editorial" | "missing-community";
   }>;
   crawlSources: Array<{
@@ -281,6 +284,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
           versionName: shoeReleases.versionName,
           reviewId: reviews.id,
           reviewStatus: reviews.status,
+          sourceId: reviewSources.id,
+          sourceName: reviewSources.name,
           sourceType: reviewSources.sourceType,
         })
         .from(shoeReleases)
@@ -296,6 +301,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         db
         .select({
           id: crawlSources.id,
+          reviewSourceId: crawlSources.reviewSourceId,
           importerKey: crawlSources.importerKey,
           sourceName: reviewSources.name,
           targetType: crawlSources.targetType,
@@ -384,6 +390,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       redditCount: number;
       userCount: number;
       pendingCount: number;
+      approvedSourceIds: Set<string>;
+      approvedSourceNames: Set<string>;
     }
   >();
 
@@ -395,6 +403,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       redditCount: 0,
       userCount: 0,
       pendingCount: 0,
+      approvedSourceIds: new Set<string>(),
+      approvedSourceNames: new Set<string>(),
     });
   }
 
@@ -406,6 +416,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       redditCount: 0,
       userCount: 0,
       pendingCount: 0,
+      approvedSourceIds: new Set<string>(),
+      approvedSourceNames: new Set<string>(),
     };
 
     if (!row.reviewId) {
@@ -419,6 +431,12 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
 
     if (row.reviewStatus === "approved" && row.sourceType) {
       entry.approvedReviewCount += 1;
+      if (row.sourceId) {
+        entry.approvedSourceIds.add(row.sourceId);
+      }
+      if (row.sourceName) {
+        entry.approvedSourceNames.add(row.sourceName);
+      }
       if (row.sourceType === "editorial") {
         entry.editorialCount += 1;
       }
@@ -432,6 +450,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
 
     coverageMap.set(row.releaseId, entry);
   }
+
+  const configuredCoverageSourceRows = crawlSourceRows.filter((source) => source.isActive);
 
   return {
     stats: {
@@ -493,6 +513,12 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         redditCount: entry.redditCount,
         userCount: entry.userCount,
         pendingCount: entry.pendingCount,
+        uniqueSourceCount: entry.approvedSourceIds.size,
+        sourceNames: [...entry.approvedSourceNames].sort((left, right) => left.localeCompare(right)),
+        missingSourceNames: configuredCoverageSourceRows
+          .filter((source) => !entry.approvedSourceIds.has(source.reviewSourceId))
+          .map((source) => source.sourceName)
+          .sort((left, right) => left.localeCompare(right)),
         coverageStatus: getCoverageStatus(entry),
       }))
       .sort((left, right) => {
