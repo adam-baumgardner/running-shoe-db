@@ -25,7 +25,7 @@ export function CompareSelector({ options, selectedIds }: CompareSelectorProps) 
   const router = useRouter();
   const pathname = usePathname();
   const [slots, setSlots] = useState<CompareSlot[]>(() => buildInitialSlots(selectedIds));
-  const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(0);
+  const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
   const [query, setQuery] = useState("");
 
   const resolvedSelectedIds = slots
