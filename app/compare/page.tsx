@@ -22,8 +22,60 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     id: shoe.id,
     label: `${shoe.brand} ${shoe.release}`,
     detail: `${shoe.category} · ${shoe.releaseYear ?? "Year TBD"} · ${shoe.isPlated ? "Plated" : "Non-plated"}`,
-    searchLabel: `${shoe.brand} ${shoe.release}${shoe.releaseYear ? ` (${shoe.releaseYear})` : ""}`,
+    searchLabel: `${shoe.brand} ${shoe.model} ${shoe.release}${shoe.releaseYear ? ` ${shoe.releaseYear}` : ""}`,
   }));
+  const comparisonRows = [
+    { label: "Category", values: selectedRows.map((shoe) => shoe.category) },
+    { label: "Usage", values: selectedRows.map((shoe) => shoe.usageSummary ?? "Pending") },
+    {
+      label: "Price",
+      values: selectedRows.map((shoe) => (shoe.priceUsd ? `$${shoe.priceUsd}` : "Pending")),
+    },
+    {
+      label: "Weight",
+      values: selectedRows.map((shoe) => (shoe.weightOz ? `${shoe.weightOz} oz` : "Pending")),
+    },
+    {
+      label: "Heel stack",
+      values: selectedRows.map((shoe) => (shoe.heelStackMm ? `${shoe.heelStackMm} mm` : "Pending")),
+    },
+    {
+      label: "Forefoot stack",
+      values: selectedRows.map((shoe) =>
+        shoe.forefootStackMm ? `${shoe.forefootStackMm} mm` : "Pending",
+      ),
+    },
+    {
+      label: "Drop",
+      values: selectedRows.map((shoe) => (shoe.dropMm ? `${shoe.dropMm} mm` : "Pending")),
+    },
+    {
+      label: "Plate",
+      values: selectedRows.map((shoe) => (shoe.isPlated ? "Plated" : "Non-plated")),
+    },
+    {
+      label: "Review score",
+      values: selectedRows.map((shoe) =>
+        shoe.averageReviewScore ? `${Math.round(shoe.averageReviewScore)}/100` : "Pending",
+      ),
+    },
+    {
+      label: "Coverage",
+      values: selectedRows.map((shoe) => shoe.reviewCoverage.summary),
+    },
+    {
+      label: "AI summary",
+      values: selectedRows.map((shoe) => shoe.aiReviewSummary?.overview ?? "Pending"),
+    },
+    {
+      label: "Top takeaways",
+      values: selectedRows.map((shoe) =>
+        shoe.reviewReconciliation.topTakeaways.length
+          ? shoe.reviewReconciliation.topTakeaways.join(" • ")
+          : "Pending",
+      ),
+    },
+  ];
 
   return (
     <main className="page-shell">
@@ -42,16 +94,6 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       <CompareSelector options={releaseOptions} selectedIds={selectedReleaseIds} />
 
       <section className="compare-grid" aria-label="Comparison results">
-        {!selectedRows.length ? (
-          <article className="detail-panel compare-empty-state" style={{ gridColumn: "1 / -1" }}>
-            <p className="feature-kicker">Start Here</p>
-            <h2>Pick two releases to generate a real comparison.</h2>
-            <p className="catalog-copy">
-              The comparison view works best when you enter the exact versions you are deciding
-              between. Start with two, then add a third only if it helps clarify the choice.
-            </p>
-          </article>
-        ) : null}
         {comparison.narrative.overview ? (
           <article className="detail-panel" style={{ gridColumn: "1 / -1" }}>
             <p className="feature-kicker">AI Compare</p>
@@ -99,97 +141,45 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
           </article>
         ) : null}
 
-        {selectedRows.map((shoe) => (
-          <article key={shoe.id} className="detail-panel">
-            <p className="feature-kicker">{shoe.category}</p>
-            <h2>
-              {shoe.brand} {shoe.release}
-            </h2>
-            <form action="/compare" className="compare-slot-form">
-              {selectedReleaseIds.map((releaseId, index) =>
-                releaseId === shoe.id ? null : (
-                  <input
-                    key={`${shoe.id}-${releaseId}-${index}`}
-                    name="release"
-                    type="hidden"
-                    value={releaseId}
-                  />
-                ),
-              )}
-              <label className="filter-field">
-                <span>Swap release</span>
-                <select defaultValue={shoe.id} name="release">
-                  {releaseOptions.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
+        {selectedRows.length ? (
+          <article className="detail-panel compare-table-panel" style={{ gridColumn: "1 / -1" }}>
+            <p className="feature-kicker">Spec Comparison</p>
+            <h2>Compare every major detail side by side.</h2>
+            <div className="compare-table-scroll">
+              <table className="compare-table">
+                <thead>
+                  <tr>
+                    <th scope="col">Spec</th>
+                    {selectedRows.map((shoe) => (
+                      <th key={shoe.id} scope="col">
+                        <div className="compare-table-head">
+                          <span className="pill">{shoe.category}</span>
+                          <strong>
+                            {shoe.brand} {shoe.release}
+                          </strong>
+                          <span>{shoe.rideProfile}</span>
+                          <Link className="text-link text-link--compact" href={`/shoes/${shoe.slug}/${shoe.releaseSlug}`}>
+                            Open shoe page
+                          </Link>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonRows.map((row) => (
+                    <tr key={row.label}>
+                      <th scope="row">{row.label}</th>
+                      {row.values.map((value, index) => (
+                        <td key={`${row.label}-${selectedRows[index]?.id ?? index}`}>{value}</td>
+                      ))}
+                    </tr>
                   ))}
-                </select>
-              </label>
-              <button className="button-secondary" type="submit">
-                Swap
-              </button>
-            </form>
-            <p className="catalog-copy">{shoe.rideProfile}</p>
-            {shoe.aiReviewSummary ? (
-              <p className="detail-muted">{shoe.aiReviewSummary.overview}</p>
-            ) : null}
-            <p className="detail-muted">{shoe.reviewCoverage.summary}</p>
-            <dl className="spec-grid">
-              <div>
-                <dt>Usage</dt>
-                <dd>{shoe.usageSummary ?? "Pending"}</dd>
-              </div>
-              <div>
-                <dt>MSRP</dt>
-                <dd>{shoe.priceUsd ? `$${shoe.priceUsd}` : "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Weight</dt>
-                <dd>{shoe.weightOz ? `${shoe.weightOz} oz` : "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Heel stack</dt>
-                <dd>{shoe.heelStackMm ? `${shoe.heelStackMm} mm` : "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Forefoot stack</dt>
-                <dd>{shoe.forefootStackMm ? `${shoe.forefootStackMm} mm` : "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Drop</dt>
-                <dd>{shoe.dropMm ? `${shoe.dropMm} mm` : "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Plate</dt>
-                <dd>{shoe.isPlated ? "Plated" : "Non-plated"}</dd>
-              </div>
-              <div>
-                <dt>Review score</dt>
-                <dd>
-                  {shoe.averageReviewScore ? `${Math.round(shoe.averageReviewScore)}/100` : "Pending"}
-                </dd>
-              </div>
-            </dl>
-            {shoe.reviewReconciliation.topTakeaways.length ? (
-              <div className="detail-chip-row">
-                {shoe.reviewReconciliation.topTakeaways.map((takeaway) => (
-                  <span className="pill" key={takeaway}>
-                    {takeaway}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            <p className="detail-muted">
-              Freshest review: {shoe.reviewCoverage.freshestReviewDate ?? "Unknown"}
-            </p>
-            <div className="card-actions">
-              <Link className="text-link" href={`/shoes/${shoe.slug}/${shoe.releaseSlug}`}>
-                Open release detail
-              </Link>
+                </tbody>
+              </table>
             </div>
           </article>
-        ))}
+        ) : null}
       </section>
     </main>
   );

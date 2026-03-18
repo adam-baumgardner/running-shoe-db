@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { startTransition, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 interface CompareOption {
@@ -15,175 +15,270 @@ interface CompareSelectorProps {
   selectedIds: string[];
 }
 
+interface CompareSlot {
+  selectedId: string | null;
+}
+
 const MAX_SLOTS = 4;
 
 export function CompareSelector({ options, selectedIds }: CompareSelectorProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const datalistId = useId();
-  const [slots, setSlots] = useState(() => buildInitialSlots(options, selectedIds));
-  const [error, setError] = useState<string | null>(null);
+  const [slots, setSlots] = useState<CompareSlot[]>(() => buildInitialSlots(selectedIds));
+  const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(0);
+  const [query, setQuery] = useState("");
 
-  function updateSlot(index: number, value: string) {
-    setSlots((current) =>
-      current.map((slot, slotIndex) =>
-        slotIndex === index ? { ...slot, inputValue: value } : slot
-      )
-    );
+  const resolvedSelectedIds = slots
+    .map((slot) => slot.selectedId)
+    .filter((value): value is string => Boolean(value));
+
+  const filteredOptions = getFilteredOptions(options, query, resolvedSelectedIds);
+  const activeSlot = activeSlotIndex === null ? null : slots[activeSlotIndex] ?? null;
+
+  function openSlot(index: number) {
+    setActiveSlotIndex(index);
+    const selectedId = slots[index]?.selectedId;
+    const selectedOption = options.find((option) => option.id === selectedId);
+    setQuery(selectedOption?.searchLabel ?? "");
   }
 
-  function addSlot() {
-    setSlots((current) =>
-      current.length >= MAX_SLOTS ? current : [...current, { inputValue: "" }]
-    );
-  }
-
-  function removeSlot(index: number) {
-    setSlots((current) => {
-      if (current.length <= 2) {
-        return current;
-      }
-
-      return current.filter((_, slotIndex) => slotIndex !== index);
-    });
-  }
-
-  function submitComparison(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const resolvedIds = slots
-      .map((slot) => findOptionId(options, slot.inputValue))
-      .filter((value): value is string => Boolean(value));
-
-    const uniqueIds = Array.from(new Set(resolvedIds));
-
-    if (uniqueIds.length < 2) {
-      setError("Pick at least two releases to compare.");
+  function selectOption(optionId: string) {
+    if (activeSlotIndex === null) {
       return;
     }
 
-    setError(null);
-    const params = new URLSearchParams();
-    uniqueIds.slice(0, MAX_SLOTS).forEach((releaseId) => params.append("release", releaseId));
-    router.push(`${pathname}?${params.toString()}`);
+    const nextSlots = slots.map((slot, index) =>
+      index === activeSlotIndex ? { selectedId: optionId } : slot
+    );
+    setSlots(nextSlots);
+    setActiveSlotIndex(null);
+    setQuery("");
+    syncSelection(nextSlots);
+  }
+
+  function clearSlot(index: number) {
+    const nextSlots = slots.map((slot, slotIndex) =>
+      slotIndex === index ? { selectedId: null } : slot
+    );
+    setSlots(nextSlots);
+    setActiveSlotIndex(index);
+    setQuery("");
+    syncSelection(nextSlots);
+  }
+
+  function addSlot() {
+    if (slots.length >= MAX_SLOTS) {
+      return;
+    }
+
+    const nextSlots = [...slots, { selectedId: null }];
+    setSlots(nextSlots);
+    setActiveSlotIndex(nextSlots.length - 1);
+    setQuery("");
+  }
+
+  function removeSlot(index: number) {
+    if (slots.length <= 2) {
+      clearSlot(index);
+      return;
+    }
+
+    const nextSlots = slots.filter((_, slotIndex) => slotIndex !== index);
+    setSlots(nextSlots);
+    setActiveSlotIndex(null);
+    setQuery("");
+    syncSelection(nextSlots);
+  }
+
+  function syncSelection(nextSlots: CompareSlot[]) {
+    const nextIds = Array.from(
+      new Set(nextSlots.map((slot) => slot.selectedId).filter((value): value is string => Boolean(value)))
+    );
+
+    startTransition(() => {
+      if (nextIds.length < 2) {
+        router.replace(pathname);
+        return;
+      }
+
+      const params = new URLSearchParams();
+      nextIds.slice(0, MAX_SLOTS).forEach((releaseId) => params.append("release", releaseId));
+      router.replace(`${pathname}?${params.toString()}`);
+    });
   }
 
   return (
     <section className="filter-shell compare-selector-shell">
       <div className="compare-selector-intro">
         <div>
-          <p className="feature-kicker">Choose Releases</p>
-          <h2>Compare the exact versions you are considering.</h2>
+          <p className="feature-kicker">Compare Shoes</p>
+          <h2>Pick the exact shoes you want side by side.</h2>
           <p className="catalog-copy">
-            Search by brand, model, or release year. Start with two shoes, then add a third or
-            fourth only if it helps the decision.
+            Search by brand, model, release, or year. As soon as at least two shoes are selected,
+            the comparison updates automatically.
           </p>
-        </div>
-        <div className="detail-chip-row">
-          {selectedIds.length ? (
-            <span className="pill">{selectedIds.length} selected</span>
-          ) : (
-            <span className="pill">Start with two releases</span>
-          )}
         </div>
       </div>
 
-      <form className="compare-selector-form" onSubmit={submitComparison}>
-        <div className="compare-slot-grid">
-          {slots.map((slot, index) => (
-            <label className="compare-slot-card" key={`${index}-${slot.inputValue}`}>
-              <span className="compare-slot-label">
-                {index === 0 ? "First release" : index === 1 ? "Second release" : `Option ${index + 1}`}
-              </span>
-              <input
-                className="compare-slot-input"
-                list={datalistId}
-                onChange={(event) => updateSlot(index, event.target.value)}
-                placeholder="Search brand, shoe, or release"
-                type="search"
-                value={slot.inputValue}
-              />
-              <span className="compare-slot-hint">
-                {findOptionDetail(options, slot.inputValue) ?? "Type to search the catalog"}
-              </span>
-              {index >= 2 ? (
-                <button
-                  className="text-link text-link--compact"
-                  onClick={() => removeSlot(index)}
-                  type="button"
-                >
-                  Remove
-                </button>
-              ) : null}
-            </label>
-          ))}
-        </div>
+      <div className="compare-slot-grid">
+        {slots.map((slot, index) => {
+          const option = options.find((item) => item.id === slot.selectedId);
+          const isActive = index === activeSlotIndex;
 
-        <datalist id={datalistId}>
-          {options.map((option) => (
-            <option key={option.id} value={option.searchLabel} />
-          ))}
-        </datalist>
+          return (
+            <div
+              className={`compare-slot-card compare-slot-card--picker${isActive ? " compare-slot-card--active" : ""}${option ? " compare-slot-card--filled" : ""}`}
+              key={`slot-${index}`}
+              onClick={() => openSlot(index)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openSlot(index);
+                }
+              }}
+              role="button"
+              tabIndex={0}
+            >
+              <span className="compare-slot-label">Shoe #{index + 1}</span>
+              {option ? (
+                <>
+                  <strong>{option.label}</strong>
+                  <span className="compare-slot-hint">{option.detail}</span>
+                  <span className="compare-slot-actions">
+                    <span className="text-link text-link--compact">Change</span>
+                    <button
+                      className="text-link text-link--compact"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        clearSlot(index);
+                      }}
+                      type="button"
+                    >
+                      Clear
+                    </button>
+                    {index >= 2 ? (
+                      <button
+                        className="text-link text-link--compact"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          removeSlot(index);
+                        }}
+                        type="button"
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="compare-slot-plus">+</span>
+                  <strong>Add a shoe</strong>
+                  <span className="compare-slot-hint">
+                    Choose a release to compare against the others.
+                  </span>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
 
-        <div className="compare-selector-actions">
-          <div className="detail-chip-row">
-            {slots.length < MAX_SLOTS ? (
-              <button className="button-secondary" onClick={addSlot} type="button">
-                Add another release
-              </button>
-            ) : null}
-            <button className="button-primary" type="submit">
-              Compare releases
-            </button>
+      <div className="compare-selector-actions">
+        {slots.length < MAX_SLOTS ? (
+          <button className="button-secondary" onClick={addSlot} type="button">
+            Add another shoe
+          </button>
+        ) : (
+          <span className="detail-muted">Up to four shoes can be compared at once.</span>
+        )}
+        <a className="text-link text-link--compact" href="/compare">
+          Reset
+        </a>
+      </div>
+
+      {activeSlot ? (
+        <div className="compare-search-panel">
+          <div className="compare-search-panel-head">
+            <div>
+              <p className="feature-kicker">Search</p>
+              <h3>Shoe #{activeSlotIndex !== null ? activeSlotIndex + 1 : 1}</h3>
+            </div>
           </div>
-          <a className="text-link text-link--compact" href="/compare">
-            Reset
-          </a>
+          <input
+            autoFocus
+            className="compare-slot-input"
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Try Endorphin, Pegasus, Speedgoat, Vaporfly..."
+            type="search"
+            value={query}
+          />
+          <div className="compare-search-results" role="listbox">
+            {filteredOptions.map((option) => (
+              <button
+                className="compare-search-result"
+                key={option.id}
+                onClick={() => selectOption(option.id)}
+                type="button"
+              >
+                <strong>{option.label}</strong>
+                <span>{option.detail}</span>
+              </button>
+            ))}
+            {!filteredOptions.length ? (
+              <div className="compare-search-empty">
+                <strong>No matching shoes yet.</strong>
+                <span>Try a broader brand, model, or release-year search.</span>
+              </div>
+            ) : null}
+          </div>
         </div>
-        {error ? <p className="detail-muted">{error}</p> : null}
-      </form>
+      ) : null}
     </section>
   );
 }
 
-function buildInitialSlots(options: CompareOption[], selectedIds: string[]) {
-  const initial = selectedIds
+function buildInitialSlots(selectedIds: string[]) {
+  const slots: CompareSlot[] = selectedIds
     .slice(0, MAX_SLOTS)
-    .map((id) => options.find((option) => option.id === id)?.searchLabel ?? "");
+    .map((selectedId) => ({ selectedId }));
 
-  while (initial.length < 2) {
-    initial.push("");
+  while (slots.length < 2) {
+    slots.push({ selectedId: null });
   }
 
-  return initial.map((inputValue) => ({ inputValue }));
+  return slots;
 }
 
-function findOptionId(options: CompareOption[], inputValue: string) {
-  const normalized = inputValue.trim().toLowerCase();
-  if (!normalized) {
-    return null;
-  }
+function getFilteredOptions(options: CompareOption[], query: string, selectedIds: string[]) {
+  const normalizedQuery = normalize(query);
+  const selectedIdSet = new Set(selectedIds);
 
-  const exact = options.find((option) => option.searchLabel.toLowerCase() === normalized);
-  if (exact) {
-    return exact.id;
-  }
+  return options
+    .filter((option) => fuzzyMatch(option.searchLabel, normalizedQuery))
+    .sort((left, right) => {
+      const leftSelected = selectedIdSet.has(left.id) ? 1 : 0;
+      const rightSelected = selectedIdSet.has(right.id) ? 1 : 0;
 
-  const partial = options.find((option) => option.searchLabel.toLowerCase().includes(normalized));
-  return partial?.id ?? null;
+      if (leftSelected !== rightSelected) {
+        return rightSelected - leftSelected;
+      }
+
+      return left.searchLabel.localeCompare(right.searchLabel);
+    })
+    .slice(0, 24);
 }
 
-function findOptionDetail(options: CompareOption[], inputValue: string) {
-  const normalized = inputValue.trim().toLowerCase();
-  if (!normalized) {
-    return null;
+function fuzzyMatch(value: string, query: string) {
+  if (!query) {
+    return true;
   }
 
-  const exact = options.find((option) => option.searchLabel.toLowerCase() === normalized);
-  if (exact) {
-    return exact.detail;
-  }
+  const haystack = normalize(value);
+  const terms = query.split(" ").filter(Boolean);
+  return terms.every((term) => haystack.includes(term));
+}
 
-  const partial = options.find((option) => option.searchLabel.toLowerCase().includes(normalized));
-  return partial?.detail ?? null;
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
