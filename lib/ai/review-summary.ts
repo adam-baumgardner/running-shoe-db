@@ -86,7 +86,7 @@ async function generateWithOpenAi(
             {
               type: "input_text",
               text:
-                "You summarize running shoe reviews and community discussion. Use only the supplied evidence. Produce concise, factual buyer guidance. Distinguish broad consensus from contested points. Explicitly judge editorial sentiment, community sentiment, and whether those two reads align. Do not invent specs or opinions.",
+                "You summarize running shoe reviews and community discussion. Use only the supplied evidence. Produce concise, factual buyer guidance in plain product language. Distinguish broad consensus from contested points. Explicitly judge editorial sentiment, community sentiment, and whether those two reads align. Prefer specific takeaways over generic hedging. Do not invent specs, comparisons, or opinions that are not supported by the supplied reviews.",
             },
           ],
         },
@@ -101,6 +101,18 @@ async function generateWithOpenAi(
                   category: input.category,
                   terrain: input.terrain,
                   stability: input.stability,
+                },
+                instructions: {
+                  overview:
+                    "Write 2-3 sentences that summarize what this shoe is generally like for a buyer right now.",
+                  buyerSignal:
+                    "Write one short line that says what kind of buyer signal the current mix of reviews gives.",
+                  consensusPoints:
+                    "These should be specific patterns reviewers broadly agree on.",
+                  debates:
+                    "These should capture where reviewers disagree or where editorial and community read the shoe differently.",
+                  channelReads:
+                    "Set editorialSentiment and communitySentiment from the actual evidence, not by guessing. If one channel is effectively absent, return null for that channel.",
                 },
                 reviews: input.reviews.map((review) => ({
                   title: review.title,
@@ -375,10 +387,10 @@ function buildWatchOuts(
     values.add("Price-to-performance comes up often, so compare MSRP against close alternatives.");
   }
   if (overallSentiment === "mixed" || overallSentiment === "negative") {
-    values.add("The current review set is not fully aligned, so treat the consensus as provisional.");
+    values.add("Fit your expectations to the shoe's more specific use case rather than treating it like a do-everything option.");
   }
   if (!values.size) {
-    values.add(`Signal is still developing for this ${input.category.toLowerCase()} model.`);
+    values.add(`Compare this ${input.category.toLowerCase()} model against shoes with a similar ride profile and intended use.`);
   }
 
   return [...values].slice(0, 3);
@@ -400,7 +412,7 @@ function buildOverview(
   const lead = `${input.releaseLabel} is landing with ${sentimentPhrase} sentiment across the current approved review set.`;
   const pro = pros[0] ? ` ${pros[0]}` : "";
   const con = cons[0] ? ` Main caution: ${cons[0].replace(/\.$/, "")}.` : "";
-  return `${lead} Confidence is ${confidence}.${pro}${con}`.trim();
+  return `${lead}${pro}${con}`.trim();
 }
 
 function buildBuyerSignal(
