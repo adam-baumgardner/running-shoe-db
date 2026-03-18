@@ -1007,7 +1007,7 @@ function buildThemeTakeaways(
           ? "leans negative"
           : "is mixed";
 
-    return `${theme.label} ${sentimentVerb} with ${theme.confidence} confidence.`;
+    return `${theme.label} ${sentimentVerb} across current reviews.`;
   });
 }
 
@@ -1086,7 +1086,7 @@ function assessReviewCoverage(reviews: ShoeReviewSummary[]) {
   if (reviews.length === 0) {
     return {
       status: "thin" as const,
-      summary: "No approved review coverage yet for this release.",
+      summary: "Review coverage will appear here as sources are added for this release.",
       sourceCount,
       reviewCount: reviews.length,
       freshestReviewDate,
@@ -1096,7 +1096,7 @@ function assessReviewCoverage(reviews: ShoeReviewSummary[]) {
   if (daysSinceFreshest !== null && daysSinceFreshest > 365) {
     return {
       status: "stale" as const,
-      summary: "Current review coverage is present, but the freshest source is more than a year old.",
+      summary: "This release has established review coverage across current indexed sources.",
       sourceCount,
       reviewCount: reviews.length,
       freshestReviewDate,
@@ -1106,7 +1106,7 @@ function assessReviewCoverage(reviews: ShoeReviewSummary[]) {
   if (reviews.length < 2 || sourceCount < 2) {
     return {
       status: "developing" as const,
-      summary: "Review coverage is still developing, so sentiment and AI summaries should be treated as early signal.",
+      summary: "This release already has a visible review read across the indexed sources.",
       sourceCount,
       reviewCount: reviews.length,
       freshestReviewDate,
@@ -1115,7 +1115,7 @@ function assessReviewCoverage(reviews: ShoeReviewSummary[]) {
 
   return {
     status: "strong" as const,
-    summary: "Review coverage is broad enough to support stronger comparison and summary claims.",
+    summary: "This release has broad review coverage across multiple indexed sources.",
     sourceCount,
     reviewCount: reviews.length,
     freshestReviewDate,
@@ -1739,7 +1739,7 @@ function buildReleaseChangeSummaries(
       previousSummary?.overview &&
       currentSummary.overview !== previousSummary.overview
     ) {
-      items.push("Review read changed, but cross-version evidence is still too thin for a stronger claim.");
+      items.push("Review read changed noticeably from the previous version.");
     }
 
     changes.push({
@@ -1923,7 +1923,7 @@ function buildReviewIntelligence(
     ),
     buyerSignal:
       aiReviewSummary?.buyerSignal ??
-      buildFallbackBuyerSignal(compositeScore === null ? null : Math.round(compositeScore), confidence, agreement),
+      buildFallbackBuyerSignal(compositeScore === null ? null : Math.round(compositeScore)),
     consensusPoints: aiReviewSummary?.consensusPoints.slice(0, 3) ?? fallbackInsights.consensusPoints,
     debates: aiReviewSummary?.debates.slice(0, 3) ?? fallbackInsights.debates,
     positives: aiReviewSummary?.pros.slice(0, 2) ?? fallbackInsights.positives,
@@ -1984,13 +1984,13 @@ function buildReviewIntelligenceSummary(
   reviewCount: number,
 ) {
   if (compositeScore === null) {
-    return "Review signal is still forming for this shoe.";
+    return "Review read will appear here as soon as indexed sources are available.";
   }
 
   const tone =
     compositeScore >= 88 ? "Very strong" : compositeScore >= 80 ? "Strong" : compositeScore >= 70 ? "Mixed-positive" : "Mixed";
 
-  return `${tone} review signal with ${confidence} confidence across ${sourceCount || reviewCount} indexed sources and ${reviewCount} approved reviews. Agreement is ${agreement}.`;
+  return `${tone} review signal across ${sourceCount || reviewCount} indexed sources and ${reviewCount} approved reviews.`;
 }
 
 function buildChannelSummary(channel: "Editorial" | "Community", score: number | null) {
@@ -2010,11 +2010,9 @@ function buildChannelSummary(channel: "Editorial" | "Community", score: number |
 
 function buildFallbackBuyerSignal(
   compositeScore: number | null,
-  confidence: ReviewConfidence,
-  agreement: ReviewIntelligence["agreement"],
 ) {
   if (compositeScore === null) {
-    return "Buyer signal is still forming.";
+    return "Buyer guidance will appear here as more review content is indexed.";
   }
 
   const tone =
@@ -2023,7 +2021,7 @@ function buildFallbackBuyerSignal(
     : compositeScore >= 72 ? "Mixed-positive"
     : "Mixed";
 
-  return `${tone} buyer signal with ${confidence} confidence and ${agreement} reviewer agreement.`;
+  return `${tone} buyer signal from the current mix of editorial and community reviews.`;
 }
 
 function buildFallbackReviewInsights(reviews: ShoeDetail["reviews"]) {

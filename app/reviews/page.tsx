@@ -32,7 +32,7 @@ export default async function ReviewsPage() {
                 <span className="pill">{item.category}</span>
                 {item.sentiment ? <span className="pill">{item.sentiment}</span> : null}
                 {item.reviewScore ? <span className="pill">Review score {item.reviewScore}/100</span> : null}
-                <span className="pill">{item.reviewConfidence} confidence</span>
+                {item.publishedAt ? <span className="pill">{item.publishedAt}</span> : null}
               </div>
               <div className="review-feed-header">
                 <div>
@@ -41,10 +41,7 @@ export default async function ReviewsPage() {
                   </p>
                   <h2>{item.title ?? `${item.brand} ${item.release}`}</h2>
                 </div>
-                <p className="detail-muted">
-                  {item.publishedAt ?? "Date pending"}
-                  {item.authorName ? ` · ${item.authorName}` : ""}
-                </p>
+                <p className="detail-muted">{item.authorName ? `${item.authorName}` : "Source review"}</p>
               </div>
               <p className="catalog-copy">{item.excerpt ?? "Excerpt pending."}</p>
               {item.aiOverview ? <p className="detail-muted">{item.aiOverview}</p> : null}

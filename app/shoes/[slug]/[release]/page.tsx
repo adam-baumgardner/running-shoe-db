@@ -101,10 +101,6 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             <dt>Sentiment signal</dt>
             <dd>{shoe.reviewIntelligence.sentimentScore ? `${shoe.reviewIntelligence.sentimentScore}/100` : "Pending"}</dd>
           </div>
-          <div>
-            <dt>Score confidence</dt>
-            <dd>{shoe.reviewIntelligence.confidence}</dd>
-          </div>
         </dl>
       </section>
 
@@ -112,7 +108,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
         <article className="detail-panel">
           <p className="feature-kicker">AI And Review Summary</p>
           <h2>What reviewers are saying</h2>
-          <p>{shoe.reviewCoverage.summary}</p>
+          <p>{shoe.aiReviewSummary?.overview ?? shoe.reviewIntelligence.summary}</p>
           <p className="detail-muted">{shoe.reviewIntelligence.summary}</p>
           {shoe.reviewIntelligence.buyerSignal ? (
             <p className="catalog-copy">{shoe.reviewIntelligence.buyerSignal}</p>
@@ -120,9 +116,11 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           <div className="detail-chip-row">
             <span className="pill">{shoe.reviewCoverage.sourceCount} sources</span>
             <span className="pill">{shoe.reviewCoverage.reviewCount} reviews</span>
-            <span className="pill">
-              Freshest review: {shoe.reviewCoverage.freshestReviewDate ?? "Unknown"}
-            </span>
+            {shoe.reviewCoverage.freshestReviewDate ? (
+              <span className="pill">
+                Latest review: {shoe.reviewCoverage.freshestReviewDate}
+              </span>
+            ) : null}
           </div>
           {shoe.aiReviewSummary ? (
             <dl className="spec-grid">

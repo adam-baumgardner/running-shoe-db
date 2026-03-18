@@ -98,10 +98,6 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
                 : "Pending"}
             </dd>
           </div>
-          <div>
-            <dt>Score confidence</dt>
-            <dd>{shoe.featuredRelease.reviewIntelligence.confidence}</dd>
-          </div>
         </dl>
       </section>
 
@@ -109,7 +105,7 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
         <article className="detail-panel">
           <p className="feature-kicker">Latest Release Summary</p>
           <h2>What stands out right now</h2>
-          <p>{shoe.featuredRelease.reviewCoverage.summary}</p>
+          <p>{shoe.featuredRelease.aiReviewSummary?.overview ?? shoe.featuredRelease.reviewIntelligence.summary}</p>
           <p className="detail-muted">{shoe.featuredRelease.reviewIntelligence.summary}</p>
           {shoe.featuredRelease.reviewIntelligence.buyerSignal ? (
             <p className="catalog-copy">{shoe.featuredRelease.reviewIntelligence.buyerSignal}</p>
@@ -117,9 +113,11 @@ export default async function ShoeDetailPage({ params }: ShoeDetailPageProps) {
           <div className="detail-chip-row">
             <span className="pill">{shoe.featuredRelease.reviewCoverage.sourceCount} sources</span>
             <span className="pill">{shoe.featuredRelease.reviewCoverage.reviewCount} reviews</span>
-            <span className="pill">
-              Freshest review: {shoe.featuredRelease.reviewCoverage.freshestReviewDate ?? "Unknown"}
-            </span>
+            {shoe.featuredRelease.reviewCoverage.freshestReviewDate ? (
+              <span className="pill">
+                Latest review: {shoe.featuredRelease.reviewCoverage.freshestReviewDate}
+              </span>
+            ) : null}
           </div>
           {shoe.featuredRelease.reviewReconciliation.topTakeaways.length ? (
             <div className="detail-chip-row">

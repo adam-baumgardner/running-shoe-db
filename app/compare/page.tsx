@@ -70,20 +70,12 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       ),
     },
     {
-      label: "Score confidence",
-      values: selectedRows.map((shoe) => shoe.reviewIntelligence.confidence),
-    },
-    {
       label: "Editorial read",
       values: selectedRows.map((shoe) => shoe.reviewIntelligence.editorialSummary ?? "Pending"),
     },
     {
       label: "Community read",
       values: selectedRows.map((shoe) => shoe.reviewIntelligence.communitySummary ?? "Pending"),
-    },
-    {
-      label: "Coverage",
-      values: selectedRows.map((shoe) => shoe.reviewCoverage.summary),
     },
     {
       label: "Review read",
@@ -143,16 +135,6 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
                 Shared signals: {comparison.narrative.sharedSignals.join(" ")}
               </p>
             ) : null}
-            {comparison.narrative.caution ? (
-              <p className="detail-muted">{comparison.narrative.caution}</p>
-            ) : null}
-            <div className="detail-chip-row">
-              {selectedRows.map((shoe) => (
-                <span className="pill" key={`${shoe.id}-coverage`}>
-                  {shoe.brand} {shoe.release}: {shoe.reviewCoverage.status}
-                </span>
-              ))}
-            </div>
             <div className="review-list">
               {comparison.narrative.keyDifferences.map((difference) => (
                 <article className="review-card" key={difference.title}>
