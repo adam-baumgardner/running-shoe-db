@@ -15,7 +15,7 @@ export function getDb() {
   if (!database) {
     client = postgres(databaseUrl, {
       prepare: false,
-      max: 2,
+      max: 4,
       ssl: "require",
       connect_timeout: 10,
       idle_timeout: 20,
