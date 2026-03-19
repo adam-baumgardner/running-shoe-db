@@ -39,6 +39,9 @@ export interface EditorialSourceOption {
   id: string;
   name: string;
   sourceType: "editorial" | "reddit" | "user";
+  slug?: string;
+  siteUrl?: string | null;
+  baseDomain?: string | null;
 }
 
 export interface EditorialReleaseOption {
@@ -267,6 +270,9 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
           id: reviewSources.id,
           name: reviewSources.name,
           sourceType: reviewSources.sourceType,
+          slug: reviewSources.slug,
+          siteUrl: reviewSources.siteUrl,
+          baseDomain: reviewSources.baseDomain,
         })
         .from(reviewSources)
         .orderBy(reviewSources.name),

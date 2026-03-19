@@ -5,6 +5,7 @@ import {
   createShoeModelAction,
   deleteBrandAction,
   deleteReleaseAction,
+  deleteReviewSourceAction,
   deleteShoeModelAction,
   generateAiReviewSummaryAction,
   generateMissingAiReviewSummariesAction,
@@ -17,6 +18,7 @@ import {
   updateBrandAction,
   updateAiReviewSummaryOverrideAction,
   updateCrawlSourceSettingsAction,
+  updateReviewSourceAction,
   updateReviewEditorialOverridesAction,
   updateReviewStatusAction,
   updateReleaseAction,
@@ -301,6 +303,56 @@ export default async function InternalPage() {
 
       <section className="detail-grid">
         <article className="detail-panel">
+          <p className="feature-kicker">Manage Sources</p>
+          <h2>Edit or delete review sources</h2>
+          <div className="editorial-stack">
+            {data.sources.map((source) => (
+              <details key={source.id}>
+                <summary className="text-link">
+                  {source.name} · {source.sourceType}
+                </summary>
+                <form action={updateReviewSourceAction} className="editorial-form">
+                  <input name="sourceId" type="hidden" value={source.id} />
+                  <label className="filter-field">
+                    <span>Name</span>
+                    <input defaultValue={source.name} name="name" required />
+                  </label>
+                  <label className="filter-field">
+                    <span>Homepage URL</span>
+                    <input defaultValue={source.siteUrl ?? ""} name="siteUrl" required type="url" />
+                  </label>
+                  <label className="filter-field">
+                    <span>Type</span>
+                    <select defaultValue={source.sourceType} name="sourceType" required>
+                      <option value="editorial">Editorial</option>
+                      <option value="reddit">Reddit</option>
+                      <option value="user">User</option>
+                    </select>
+                  </label>
+                  <label className="filter-field">
+                    <span>Slug</span>
+                    <input defaultValue={source.slug ?? ""} name="slug" />
+                  </label>
+                  <label className="filter-field">
+                    <span>Base domain</span>
+                    <input defaultValue={source.baseDomain ?? ""} name="baseDomain" />
+                  </label>
+                  <button className="button-secondary" type="submit">
+                    Save source
+                  </button>
+                </form>
+                <form action={deleteReviewSourceAction}>
+                  <input name="sourceId" type="hidden" value={source.id} />
+                  <button className="button-secondary" type="submit">
+                    Delete source
+                  </button>
+                </form>
+              </details>
+            ))}
+          </div>
+        </article>
+
+        <article className="detail-panel">
           <p className="feature-kicker">Add Brand</p>
           <h2>Create a catalog brand</h2>
           <form action={createBrandAction} className="editorial-form">
@@ -394,8 +446,8 @@ export default async function InternalPage() {
               <input name="name" required />
             </label>
             <label className="filter-field">
-              <span>Slug</span>
-              <input name="slug" required />
+              <span>Homepage URL</span>
+              <input name="siteUrl" required type="url" />
             </label>
             <label className="filter-field">
               <span>Type</span>
@@ -405,14 +457,10 @@ export default async function InternalPage() {
                 <option value="user">User</option>
               </select>
             </label>
-            <label className="filter-field">
-              <span>Site URL</span>
-              <input name="siteUrl" type="url" />
-            </label>
-            <label className="filter-field">
-              <span>Base domain</span>
-              <input name="baseDomain" />
-            </label>
+            <p className="detail-muted">
+              Slug and base domain will be derived automatically from the source name and homepage
+              URL.
+            </p>
             <button className="button-primary" type="submit">
               Save source
             </button>

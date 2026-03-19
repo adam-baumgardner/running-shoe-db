@@ -32,14 +32,19 @@ function requireDatabase() {
 export async function createReviewSourceAction(formData: FormData) {
   const db = requireDatabase();
   const name = String(formData.get("name") ?? "").trim();
-  const slug = String(formData.get("slug") ?? "").trim();
-  const sourceType = String(formData.get("sourceType") ?? "").trim() as "editorial" | "reddit" | "user";
-  const siteUrl = String(formData.get("siteUrl") ?? "").trim();
-  const baseDomain = String(formData.get("baseDomain") ?? "").trim();
+  const rawSlug = String(formData.get("slug") ?? "").trim();
+  const sourceTypeRaw = String(formData.get("sourceType") ?? "").trim();
+  const siteUrlInput = String(formData.get("siteUrl") ?? "").trim();
+  const baseDomainInput = String(formData.get("baseDomain") ?? "").trim();
 
-  if (!name || !slug || !sourceType) {
-    throw new Error("Missing required source fields.");
+  if (!name || !siteUrlInput) {
+    throw new Error("Source name and homepage URL are required.");
   }
+
+  const siteUrl = normalizeSiteUrl(siteUrlInput);
+  const sourceType = (sourceTypeRaw || "editorial") as "editorial" | "reddit" | "user";
+  const slug = rawSlug || slugify(name);
+  const baseDomain = baseDomainInput || getBaseDomain(siteUrl);
 
   await db.insert(reviewSources).values({
     name,
@@ -48,6 +53,69 @@ export async function createReviewSourceAction(formData: FormData) {
     siteUrl: siteUrl || null,
     baseDomain: baseDomain || null,
   });
+
+  revalidatePath("/internal");
+}
+
+export async function updateReviewSourceAction(formData: FormData) {
+  const db = requireDatabase();
+  const sourceId = String(formData.get("sourceId") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const rawSlug = String(formData.get("slug") ?? "").trim();
+  const sourceTypeRaw = String(formData.get("sourceType") ?? "").trim();
+  const siteUrlInput = String(formData.get("siteUrl") ?? "").trim();
+  const baseDomainInput = String(formData.get("baseDomain") ?? "").trim();
+
+  if (!sourceId || !name || !siteUrlInput) {
+    throw new Error("Source id, name, and homepage URL are required.");
+  }
+
+  const siteUrl = normalizeSiteUrl(siteUrlInput);
+  const sourceType = (sourceTypeRaw || "editorial") as "editorial" | "reddit" | "user";
+
+  await db
+    .update(reviewSources)
+    .set({
+      name,
+      slug: rawSlug || slugify(name),
+      sourceType,
+      siteUrl,
+      baseDomain: baseDomainInput || getBaseDomain(siteUrl),
+    })
+    .where(eq(reviewSources.id, sourceId));
+
+  revalidatePath("/internal");
+}
+
+export async function deleteReviewSourceAction(formData: FormData) {
+  const db = requireDatabase();
+  const sourceId = String(formData.get("sourceId") ?? "").trim();
+
+  if (!sourceId) {
+    throw new Error("Source id is required.");
+  }
+
+  const linkedReviews = await db.query.reviews.findMany({
+    where: eq(reviews.sourceId, sourceId),
+    columns: { id: true },
+    limit: 1,
+  });
+
+  if (linkedReviews.length) {
+    throw new Error("Unpublish or delete reviews from this source before deleting it.");
+  }
+
+  const linkedCrawlSources = await db.query.crawlSources.findMany({
+    where: eq(crawlSources.reviewSourceId, sourceId),
+    columns: { id: true },
+    limit: 1,
+  });
+
+  if (linkedCrawlSources.length) {
+    throw new Error("Delete crawl-source entries for this review source before deleting it.");
+  }
+
+  await db.delete(reviewSources).where(eq(reviewSources.id, sourceId));
 
   revalidatePath("/internal");
 }
@@ -1003,6 +1071,17 @@ function slugify(value: string) {
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+function normalizeSiteUrl(value: string) {
+  const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  const parsed = new URL(candidate);
+  return parsed.toString().replace(/\/$/, "");
+}
+
+function getBaseDomain(siteUrl: string) {
+  const parsed = new URL(siteUrl);
+  return parsed.hostname.replace(/^www\./i, "");
 }
 
 function parseLineList(value: string, limit: number) {
