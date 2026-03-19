@@ -39,3 +39,21 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - Saucony
 - HOKA
 - Brooks
+
+### Nike
+- `Pegasus`
+  - Seeded before correction: `Pegasus 40`, `Pegasus 41`
+  - Official site confirms `Pegasus 42`
+  - Action taken: added `Pegasus 42`, marked `Pegasus 41` no longer current
+- `Vomero`
+  - Current seeded latest remains `Vomero 18`
+  - No newer official product confirmed in this pass
+- `Alphafly`
+  - Current seeded latest remains `Alphafly 3`
+  - No newer official product confirmed in this pass
+- `Pegasus Trail`
+  - Current seeded latest remains `Pegasus Trail 5`
+  - No newer official product confirmed in this pass
+- `Vaporfly`
+  - Current seeded latest remains `Vaporfly 4`
+  - No newer official product confirmed in this pass
