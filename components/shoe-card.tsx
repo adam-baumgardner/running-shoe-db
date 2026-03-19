@@ -7,7 +7,7 @@ interface ShoeCardProps {
 
 export function ShoeCard({ shoe }: ShoeCardProps) {
   const releaseHref = `/shoes/${shoe.slug}/${shoe.releaseSlug}`;
-  const familyHref = `/shoes/${shoe.slug}`;
+  const summary = shoe.aiReviewSummary?.overview ?? shoe.reviewIntelligence.summary;
 
   return (
     <article className="catalog-row">
@@ -20,8 +20,8 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
       <div className="catalog-row-primary">
         <div className="catalog-row-title">
           <h2>
-            <Link href={familyHref}>
-              {shoe.model}
+            <Link href={releaseHref}>
+              {shoe.release}
             </Link>
           </h2>
           <div className="detail-chip-row">
@@ -30,11 +30,8 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
           </div>
         </div>
         <div className="catalog-row-actions">
-          <Link className="text-link text-link--compact" href={familyHref}>
-            Shoe page
-          </Link>
           <Link className="text-link text-link--compact" href={releaseHref}>
-            Release detail
+            Open shoe
           </Link>
           <Link className="text-link text-link--cta text-link--compact" href={`/compare?release=${shoe.id}`}>
             Compare
@@ -92,14 +89,12 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
           <dd>{shoe.reviewScore ? `${shoe.reviewScore}/100` : "Pending"}</dd>
         </div>
         <div>
-          <dt>Review read</dt>
-          <dd>{shoe.reviewIntelligence.confidence} confidence</dd>
-        </div>
-        <div>
           <dt>Reviews</dt>
           <dd>{shoe.reviewCount}</dd>
         </div>
       </dl>
+
+      {summary ? <p className="catalog-row-summary-text">{summary}</p> : null}
     </article>
   );
 }

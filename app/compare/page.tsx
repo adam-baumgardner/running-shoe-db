@@ -82,10 +82,6 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       values: selectedRows.map((shoe) => shoe.reviewIntelligence.sourceAlignment),
     },
     {
-      label: "Review read",
-      values: selectedRows.map((shoe) => shoe.reviewIntelligence.summary),
-    },
-    {
       label: "Buyer signal",
       values: selectedRows.map((shoe) => shoe.reviewIntelligence.buyerSignal ?? "Pending"),
     },
@@ -175,7 +171,7 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
                           </strong>
                           <span>{shoe.rideProfile}</span>
                           <Link className="text-link text-link--compact" href={`/shoes/${shoe.slug}/${shoe.releaseSlug}`}>
-                            Open shoe page
+                            Open shoe
                           </Link>
                         </div>
                       </th>

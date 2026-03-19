@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getReleaseDetail, getShoeParentPageData } from "@/lib/server/catalog";
 
@@ -16,15 +15,6 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   if (!shoe || !parent) {
     notFound();
   }
-
-  const currentReleaseIndex = parent.releases.findIndex(
-    (release) => release.releaseSlug === resolvedParams.release,
-  );
-  const newerRelease = currentReleaseIndex > 0 ? parent.releases[currentReleaseIndex - 1] : null;
-  const olderRelease =
-    currentReleaseIndex >= 0 && currentReleaseIndex < parent.releases.length - 1
-      ? parent.releases[currentReleaseIndex + 1]
-      : null;
 
   return (
     <main className="page-shell detail-shell">
@@ -51,11 +41,8 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             <h2>{shoe.release}</h2>
           </div>
           <div className="card-actions">
-            <Link className="text-link" href={`/shoes/${shoe.slug}`}>
-              Back to shoe page
-            </Link>
             <a className="text-link text-link--cta" href={`/compare?release=${shoe.id}`}>
-              Compare this release
+              Compare this shoe
             </a>
           </div>
         </div>
@@ -200,14 +187,18 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
 
         <article className="detail-panel">
           <p className="feature-kicker">Past Releases</p>
-          <h2>See every release in this shoe line</h2>
+          <h2>Compare releases in this shoe line</h2>
           <div className="release-list">
-            {parent.releases.map((release) => (
-              <details className="release-list-item" key={release.id} open={release.releaseSlug === resolvedParams.release}>
+            {parent.releases.map((release, index) => (
+              <details
+                className="release-list-item"
+                key={release.id}
+                open={index < 2 || release.releaseSlug === resolvedParams.release}
+              >
                 <summary>
-                  <span>
+                  <span className="release-list-summary-copy">
                     <strong>{release.release}</strong>
-                    <span className="detail-muted">
+                    <span className="detail-muted release-list-summary-meta">
                       {release.releaseYear ?? "Pending year"} ·{" "}
                       {release.priceUsd ? `$${release.priceUsd}` : "Pending MSRP"}
                     </span>
@@ -234,36 +225,42 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                   </p>
                   <div className="card-actions">
                     <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
-                      Open release
+                      Open shoe
                     </a>
                     <a className="text-link" href={`/compare?release=${release.id}`}>
-                      Compare release
+                      Compare shoe
                     </a>
                   </div>
                 </div>
               </details>
             ))}
           </div>
-          <div className="card-actions">
-            {newerRelease ? (
-              <a className="text-link" href={`/shoes/${shoe.slug}/${newerRelease.releaseSlug}`}>
-                Newer release: {newerRelease.release}
-              </a>
-            ) : null}
-            {olderRelease ? (
-              <a className="text-link" href={`/shoes/${shoe.slug}/${olderRelease.releaseSlug}`}>
-                Older release: {olderRelease.release}
-              </a>
-            ) : null}
-          </div>
         </article>
 
         <article className="detail-panel">
           <p className="feature-kicker">Fit And Notes</p>
           <h2>What to know before buying</h2>
-          <p>{shoe.fitNotes ?? "Fit notes pending."}</p>
-          <p>{shoe.notes ?? "Release notes pending."}</p>
-          <p className="detail-muted">{shoe.sourceNotes ?? "Source note pending."}</p>
+          {shoe.reviewIntelligence.buyerSignal ? <p>{shoe.reviewIntelligence.buyerSignal}</p> : null}
+          {shoe.aiReviewSummary?.bestFor.length ? (
+            <div className="detail-chip-row">
+              {shoe.aiReviewSummary.bestFor.map((item) => (
+                <span className="pill" key={item}>
+                  {item}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {shoe.aiReviewSummary?.watchOuts.length ? (
+            <div className="detail-chip-row">
+              {shoe.aiReviewSummary.watchOuts.map((item) => (
+                <span className="pill" key={item}>
+                  {item}
+                </span>
+              ))}
+            </div>
+          ) : null}
+          {shoe.fitNotes ? <p>{shoe.fitNotes}</p> : null}
+          {shoe.notes ? <p>{shoe.notes}</p> : null}
         </article>
 
         <article className="detail-panel">

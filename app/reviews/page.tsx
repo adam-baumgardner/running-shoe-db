@@ -68,10 +68,7 @@ export default async function ReviewsPage() {
               ) : null}
               <div className="card-actions">
                 <Link className="text-link text-link--cta" href={`/shoes/${item.shoeSlug}/${item.releaseSlug}`}>
-                  Open release detail
-                </Link>
-                <Link className="text-link" href={`/shoes/${item.shoeSlug}`}>
-                  Open shoe page
+                  Open shoe
                 </Link>
                 <a className="text-link" href={item.sourceUrl} target="_blank" rel="noreferrer">
                   Open source review

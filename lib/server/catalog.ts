@@ -40,6 +40,7 @@ export interface CatalogCard {
   averageReviewScore: number | null;
   reviewScore: number | null;
   reviewIntelligence: ReviewIntelligence;
+  aiReviewSummary: ReleaseAiReviewSummary | null;
   terrain: string;
   stability: string;
   isPlated: boolean;
@@ -354,6 +355,7 @@ export async function getCatalogCards(filters: CatalogFilters = {}): Promise<Cat
         isCurrent: shoeReleases.isCurrent,
         isPlated: shoeReleases.isPlated,
         foam: shoeReleases.foam,
+        metadata: shoeReleases.metadata,
         weightOzMen: shoeSpecs.weightOzMen,
         heelStackMm: shoeSpecs.heelStackMm,
         forefootStackMm: shoeSpecs.forefootStackMm,
@@ -384,6 +386,7 @@ export async function getCatalogCards(filters: CatalogFilters = {}): Promise<Cat
         shoeReleases.isCurrent,
         shoeReleases.isPlated,
         shoeReleases.foam,
+        shoeReleases.metadata,
         shoeSpecs.weightOzMen,
         shoeSpecs.heelStackMm,
         shoeSpecs.forefootStackMm,
@@ -394,7 +397,8 @@ export async function getCatalogCards(filters: CatalogFilters = {}): Promise<Cat
     const parsedRows: CatalogCard[] = rows.map((row) => {
       const reviewCount = Number(row.reviewCount);
       const averageReviewScore = row.averageReviewScore ? Number(row.averageReviewScore) : null;
-      const reviewIntelligence = buildAggregateReviewIntelligence(reviewCount, averageReviewScore, null);
+      const aiReviewSummary = getReleaseAiReviewSummary(row.metadata);
+      const reviewIntelligence = buildAggregateReviewIntelligence(reviewCount, averageReviewScore, aiReviewSummary);
 
       return {
         id: row.id,
@@ -419,6 +423,7 @@ export async function getCatalogCards(filters: CatalogFilters = {}): Promise<Cat
         averageReviewScore,
         reviewScore: reviewIntelligence.compositeScore,
         reviewIntelligence,
+        aiReviewSummary,
         isPlated: row.isPlated,
         isCurrent: row.isCurrent,
       };
@@ -1426,6 +1431,7 @@ function buildFallbackCatalog(): CatalogCard[] {
       averageReviewScore,
       reviewScore: reviewIntelligence.compositeScore,
       reviewIntelligence,
+      aiReviewSummary: null,
       isPlated: false,
       isCurrent: true,
     };
@@ -1682,7 +1688,7 @@ function buildReleaseChangeSummaries(
         release: current.release,
         releaseSlug: slugifyRelease(current.release),
         previousRelease: null,
-        changes: ["Earliest tracked release in the current catalog."],
+        changes: ["Baseline release for this shoe line in the current catalog."],
       });
       continue;
     }
@@ -1745,7 +1751,7 @@ function buildReleaseChangeSummaries(
       previousSummary?.overview &&
       currentSummary.overview !== previousSummary.overview
     ) {
-      items.push("Review read changed noticeably from the previous version.");
+      items.push("Review sentiment changed noticeably from the previous version.");
     }
 
     changes.push({
@@ -2007,7 +2013,7 @@ function buildReviewIntelligenceSummary(
   reviewCount: number,
 ) {
   if (compositeScore === null) {
-    return "Review read will appear here as soon as indexed sources are available.";
+    return "Review summary will appear here as soon as approved sources are available.";
   }
 
   const tone =
@@ -2254,7 +2260,7 @@ function buildComparisonDifferences(
     : [];
   if (themeLeaders.length >= 2) {
     insights.push({
-      title: "Review read",
+      title: "Review takeaway",
       summary: themeLeaders.map((entry) => `${entry.row.brand} ${entry.row.release}: ${entry.theme}`).join(" "),
       evidence: themeLeaders.map((entry) => `${entry.row.brand} ${entry.row.release}: ${entry.theme}`),
     });

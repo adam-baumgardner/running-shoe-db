@@ -460,7 +460,7 @@ a {
 .catalog-row-primary {
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.4fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
 }
 
@@ -484,13 +484,15 @@ a {
   gap: 0.45rem;
 }
 
-.catalog-row-summary {
-  min-width: 0;
-}
-
-.catalog-row-summary .catalog-copy {
+.catalog-row-summary-text {
   margin: 0;
-  max-width: 36rem;
+  max-width: 52rem;
+  color: var(--muted);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .catalog-row-status {
@@ -930,6 +932,17 @@ a {
   padding: 1rem 1.1rem;
   list-style: none;
   cursor: pointer;
+}
+
+.release-list-summary-copy {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+}
+
+.release-list-summary-meta {
+  display: block;
+  line-height: 1.35;
 }
 
 .release-list-item summary::-webkit-details-marker {

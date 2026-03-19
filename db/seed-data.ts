@@ -76,6 +76,8 @@ export interface SeedReview {
   publishedAt: string;
 }
 
+const PLACEHOLDER_REVIEW_URL_PREFIX = "https://example.com/reviews/";
+
 export interface SeedCrawlSource {
   reviewSourceSlug: string;
   importerKey: string;
@@ -2334,6 +2336,10 @@ export const seedReviewSources: SeedReviewSource[] = [
   },
 ];
 
+const reviewSourceSiteUrlBySlug = Object.fromEntries(
+  seedReviewSources.map((source) => [source.slug, source.siteUrl]),
+) as Record<string, string>;
+
 export const seedReviewAuthors: SeedReviewAuthor[] = [
   {
     sourceSlug: "roadtrailrun",
@@ -3494,9 +3500,13 @@ const recentReviewDateOverrides: Record<string, string> = {
 
 export const seedReviews: SeedReview[] = baseSeedReviews.map((review) => {
   const overrideKey = `${review.releaseKey}:${review.sourceSlug}`;
+  const sourceUrl = review.sourceUrl.startsWith(PLACEHOLDER_REVIEW_URL_PREFIX)
+    ? reviewSourceSiteUrlBySlug[review.sourceSlug] ?? review.sourceUrl
+    : review.sourceUrl;
 
   return {
     ...review,
+    sourceUrl,
     publishedAt: recentReviewDateOverrides[overrideKey] ?? review.publishedAt,
   };
 });
