@@ -29,8 +29,9 @@ Use the existing shoe model set as the baseline, then verify whether each model'
   - Official site confirms `FuelCell SuperComp Elite v5`
   - Action taken: added `FuelCell SuperComp Elite v5`, marked `v4` no longer current
 - `Fresh Foam X 1080`
-  - Current seeded latest remains `v14`
-  - No newer official product confirmed in this pass
+  - Seeded before correction: `v13`, `v14`
+  - Official site confirms `1080v15`
+  - Action taken: added `1080v15`, marked `v14` no longer current
 
 ## Next Brands To Audit
 - Nike
