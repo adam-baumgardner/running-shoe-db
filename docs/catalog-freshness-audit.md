@@ -169,3 +169,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `Saucony Kinvara`
   - Official site confirms current `Kinvara 16`
   - Added baseline releases: `Kinvara 15`, `Kinvara 16`
+- `Brooks Ghost Max`
+  - Official site confirms current `Ghost Max 3`
+  - Added baseline releases: `Ghost Max 2`, `Ghost Max 3`
