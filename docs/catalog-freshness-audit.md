@@ -175,3 +175,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `Brooks Hyperion Max`
   - Official site confirms current `Hyperion Max 3`
   - Added baseline releases: `Hyperion Max 2`, `Hyperion Max 3`
+- `Nike Invincible`
+  - Official site confirms current `Invincible 3`
+  - Added baseline releases: `Invincible 2`, `Invincible 3`
