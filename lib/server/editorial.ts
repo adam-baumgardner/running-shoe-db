@@ -699,11 +699,25 @@ function getFallbackEditorialDashboardData(): EditorialDashboardData {
 }
 
 async function safeQuery<T>(promise: Promise<T>, fallback: T, label: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
   try {
-    return await promise;
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timeoutId = setTimeout(() => {
+          console.error(`Editorial dashboard query timed out: ${label}`);
+          resolve(fallback);
+        }, 5000);
+      }),
+    ]);
   } catch (error) {
     console.error(`Editorial dashboard query failed: ${label}`, error);
     return fallback;
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
