@@ -708,7 +708,7 @@ async function safeQuery<T>(promise: Promise<T>, fallback: T, label: string): Pr
         timeoutId = setTimeout(() => {
           console.error(`Editorial dashboard query timed out: ${label}`);
           resolve(fallback);
-        }, 5000);
+        }, 15000);
       }),
     ]);
   } catch (error) {
