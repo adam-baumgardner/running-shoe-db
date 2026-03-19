@@ -420,9 +420,15 @@ export async function updateReleaseAction(formData: FormData) {
   const releaseYearRaw = String(formData.get("releaseYear") ?? "").trim();
   const msrpUsd = String(formData.get("msrpUsd") ?? "").trim();
   const isCurrent = formData.get("isCurrent") === "on";
+  const isPlated = formData.get("isPlated") === "on";
   const foam = String(formData.get("foam") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
   const weightOzMen = String(formData.get("weightOzMen") ?? "").trim();
+  const heelStackMmRaw = String(formData.get("heelStackMm") ?? "").trim();
+  const forefootStackMmRaw = String(formData.get("forefootStackMm") ?? "").trim();
   const dropMmRaw = String(formData.get("dropMm") ?? "").trim();
+  const fitNotes = String(formData.get("fitNotes") ?? "").trim();
+  const sourceNotes = String(formData.get("sourceNotes") ?? "").trim();
 
   if (!releaseId || !versionName) {
     throw new Error("Release id and version name are required.");
@@ -450,21 +456,33 @@ export async function updateReleaseAction(formData: FormData) {
       releaseYear: releaseYearRaw ? Number(releaseYearRaw) : null,
       msrpUsd: msrpUsd || null,
       isCurrent,
+      isPlated,
       foam: foam || null,
+      notes: notes || null,
       updatedAt: new Date(),
     })
     .where(eq(shoeReleases.id, releaseId));
 
   const hasWeight = formData.has("weightOzMen");
+  const hasHeel = formData.has("heelStackMm");
+  const hasForefoot = formData.has("forefootStackMm");
   const hasDrop = formData.has("dropMm");
+  const hasFitNotes = formData.has("fitNotes");
+  const hasSourceNotes = formData.has("sourceNotes");
 
-  if (hasWeight || hasDrop) {
+  if (hasWeight || hasHeel || hasForefoot || hasDrop || hasFitNotes || hasSourceNotes) {
     const existingSpec = await db.query.shoeSpecs.findFirst({
       where: eq(shoeSpecs.releaseId, releaseId),
     });
     const specValues = {
       weightOzMen: hasWeight ? (weightOzMen || null) : existingSpec?.weightOzMen ?? null,
+      heelStackMm: hasHeel ? (heelStackMmRaw ? Number(heelStackMmRaw) : null) : existingSpec?.heelStackMm ?? null,
+      forefootStackMm: hasForefoot
+        ? (forefootStackMmRaw ? Number(forefootStackMmRaw) : null)
+        : existingSpec?.forefootStackMm ?? null,
       dropMm: hasDrop ? (dropMmRaw ? Number(dropMmRaw) : null) : existingSpec?.dropMm ?? null,
+      fitNotes: hasFitNotes ? (fitNotes || null) : existingSpec?.fitNotes ?? null,
+      sourceNotes: hasSourceNotes ? (sourceNotes || null) : existingSpec?.sourceNotes ?? null,
     };
 
     if (existingSpec) {

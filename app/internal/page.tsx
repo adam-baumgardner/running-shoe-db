@@ -249,9 +249,46 @@ export default async function InternalPage() {
                     <span>Current model</span>
                     <input defaultChecked={release.isCurrent} name="isCurrent" type="checkbox" />
                   </label>
+                  <label className="filter-field checkbox-field">
+                    <span>Plated</span>
+                    <input defaultChecked={release.isPlated} name="isPlated" type="checkbox" />
+                  </label>
                   <label className="filter-field">
                     <span>Foam</span>
                     <input defaultValue={release.foam ?? ""} name="foam" />
+                  </label>
+                  <label className="filter-field">
+                    <span>Weight (men, oz)</span>
+                    <input defaultValue={release.weightOzMen ?? ""} name="weightOzMen" step="0.1" type="number" />
+                  </label>
+                  <label className="filter-field">
+                    <span>Heel stack</span>
+                    <input defaultValue={release.heelStackMm ?? ""} name="heelStackMm" step="1" type="number" />
+                  </label>
+                  <label className="filter-field">
+                    <span>Forefoot stack</span>
+                    <input
+                      defaultValue={release.forefootStackMm ?? ""}
+                      name="forefootStackMm"
+                      step="1"
+                      type="number"
+                    />
+                  </label>
+                  <label className="filter-field">
+                    <span>Drop</span>
+                    <input defaultValue={release.dropMm ?? ""} name="dropMm" step="1" type="number" />
+                  </label>
+                  <label className="filter-field">
+                    <span>Release notes</span>
+                    <textarea defaultValue={release.notes ?? ""} name="notes" rows={3} />
+                  </label>
+                  <label className="filter-field">
+                    <span>Fit notes</span>
+                    <textarea defaultValue={release.fitNotes ?? ""} name="fitNotes" rows={3} />
+                  </label>
+                  <label className="filter-field">
+                    <span>Source notes</span>
+                    <textarea defaultValue={release.sourceNotes ?? ""} name="sourceNotes" rows={3} />
                   </label>
                   <button className="button-secondary" type="submit">
                     Save release
@@ -1125,7 +1162,7 @@ export default async function InternalPage() {
 
       <section className="detail-panel editorial-table-panel">
         <p className="feature-kicker">Moderation</p>
-        <h2>Recent reviews</h2>
+        <h2>Latest 50 reviews</h2>
         <div className="editorial-table">
           <div className="editorial-table-head">Review</div>
           <div className="editorial-table-head">Release</div>

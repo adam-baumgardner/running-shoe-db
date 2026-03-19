@@ -57,8 +57,16 @@ export interface EditorialReleaseOption {
   versionName?: string;
   releaseYear?: number | null;
   isCurrent?: boolean;
+  isPlated?: boolean;
   foam?: string | null;
   msrpUsd?: number | null;
+  notes?: string | null;
+  weightOzMen?: number | null;
+  heelStackMm?: number | null;
+  forefootStackMm?: number | null;
+  dropMm?: number | null;
+  fitNotes?: string | null;
+  sourceNotes?: string | null;
 }
 
 export interface EditorialReviewRow {
@@ -253,13 +261,22 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
           versionName: shoeReleases.versionName,
           releaseYear: shoeReleases.releaseYear,
           isCurrent: shoeReleases.isCurrent,
+          isPlated: shoeReleases.isPlated,
           foam: shoeReleases.foam,
           msrpUsd: shoeReleases.msrpUsd,
+          notes: shoeReleases.notes,
+          weightOzMen: shoeSpecs.weightOzMen,
+          heelStackMm: shoeSpecs.heelStackMm,
+          forefootStackMm: shoeSpecs.forefootStackMm,
+          dropMm: shoeSpecs.dropMm,
+          fitNotes: shoeSpecs.fitNotes,
+          sourceNotes: shoeSpecs.sourceNotes,
           metadata: shoeReleases.metadata,
         })
         .from(shoeReleases)
         .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
         .innerJoin(brands, eq(shoes.brandId, brands.id))
+        .leftJoin(shoeSpecs, eq(shoeSpecs.releaseId, shoeReleases.id))
         .orderBy(desc(shoeReleases.releaseYear), shoes.name),
       [],
       "release rows",
@@ -302,8 +319,8 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
         .innerJoin(shoeReleases, eq(reviews.releaseId, shoeReleases.id))
         .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
         .innerJoin(reviewSources, eq(reviews.sourceId, reviewSources.id))
-        .orderBy(desc(reviews.createdAt))
-        .limit(20),
+        .orderBy(desc(reviews.updatedAt))
+        .limit(50),
         [],
         "recent reviews",
       ),
@@ -537,8 +554,16 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       versionName: release.versionName,
       releaseYear: release.releaseYear,
       isCurrent: release.isCurrent,
+      isPlated: release.isPlated,
       foam: release.foam,
       msrpUsd: release.msrpUsd ? Number(release.msrpUsd) : null,
+      notes: release.notes,
+      weightOzMen: release.weightOzMen ? Number(release.weightOzMen) : null,
+      heelStackMm: release.heelStackMm,
+      forefootStackMm: release.forefootStackMm,
+      dropMm: release.dropMm,
+      fitNotes: release.fitNotes,
+      sourceNotes: release.sourceNotes,
     })),
     sources: sourceRows,
     recentReviews: reviewRows.map((review) => ({
