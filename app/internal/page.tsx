@@ -3,6 +3,9 @@ import {
   createManualReviewAction,
   createReviewSourceAction,
   createShoeModelAction,
+  deleteBrandAction,
+  deleteReleaseAction,
+  deleteShoeModelAction,
   generateAiReviewSummaryAction,
   generateMissingAiReviewSummariesAction,
   runBelieveInTheRunCrawlAction,
@@ -11,10 +14,13 @@ import {
   runRedditRunningShoeGeeksCrawlAction,
   runRunRepeatCrawlAction,
   runScheduledIngestionAction,
+  updateBrandAction,
   updateAiReviewSummaryOverrideAction,
   updateCrawlSourceSettingsAction,
   updateReviewEditorialOverridesAction,
   updateReviewStatusAction,
+  updateReleaseAction,
+  updateShoeModelAction,
   upsertReleaseAction,
 } from "@/app/internal/actions";
 import { getImporterByKey } from "@/lib/ingestion";
@@ -29,7 +35,7 @@ export default async function InternalPage() {
   try {
     data = await withTimeout(
       getEditorialDashboardData(),
-      8000,
+      30000,
       "Internal dashboard timed out while loading server data.",
     );
   } catch (error) {
@@ -66,8 +72,8 @@ export default async function InternalPage() {
           <p className="eyebrow">Internal</p>
           <h1>Editorial operations for sources, intake, and moderation.</h1>
           <p className="hero-copy">
-            This is the first internal dashboard. It is intentionally narrow: manage review
-            sources, queue manual reviews, and moderate what becomes public.
+            Manage catalog entities, moderate reviews, request new review fetches, and regenerate
+            release-level AI summaries.
           </p>
         </div>
       </section>
@@ -95,6 +101,201 @@ export default async function InternalPage() {
             This dashboard handles manual correction and intake while the automated crawl pipeline is
             being built.
           </p>
+        </article>
+      </section>
+
+      <section className="detail-grid">
+        <article className="detail-panel">
+          <p className="feature-kicker">Manage Brands</p>
+          <h2>Edit or delete brands</h2>
+          <div className="editorial-stack">
+            {data.brands.map((brand) => (
+              <details key={brand.id}>
+                <summary className="text-link">{brand.name}</summary>
+                <form action={updateBrandAction} className="editorial-form">
+                  <input name="brandId" type="hidden" value={brand.id} />
+                  <label className="filter-field">
+                    <span>Name</span>
+                    <input defaultValue={brand.name} name="name" required />
+                  </label>
+                  <label className="filter-field">
+                    <span>Slug</span>
+                    <input defaultValue={brand.slug ?? ""} name="slug" />
+                  </label>
+                  <label className="filter-field">
+                    <span>Website URL</span>
+                    <input defaultValue={brand.websiteUrl ?? ""} name="websiteUrl" type="url" />
+                  </label>
+                  <button className="button-secondary" type="submit">
+                    Save brand
+                  </button>
+                </form>
+                <form action={deleteBrandAction}>
+                  <input name="brandId" type="hidden" value={brand.id} />
+                  <button className="button-secondary" type="submit">
+                    Delete brand
+                  </button>
+                </form>
+              </details>
+            ))}
+          </div>
+        </article>
+
+        <article className="detail-panel">
+          <p className="feature-kicker">Manage Shoes</p>
+          <h2>Edit or delete shoe models</h2>
+          <div className="editorial-stack">
+            {data.shoes.map((shoe) => (
+              <details key={shoe.id}>
+                <summary className="text-link">{shoe.label}</summary>
+                <form action={updateShoeModelAction} className="editorial-form">
+                  <input name="shoeId" type="hidden" value={shoe.id} />
+                  <label className="filter-field">
+                    <span>Brand</span>
+                    <select defaultValue={shoe.brandId ?? ""} name="brandId" required>
+                      {data.brands.map((brand) => (
+                        <option key={brand.id} value={brand.id}>
+                          {brand.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="filter-field">
+                    <span>Name</span>
+                    <input defaultValue={shoe.name ?? ""} name="name" required />
+                  </label>
+                  <label className="filter-field">
+                    <span>Slug</span>
+                    <input defaultValue={shoe.slug ?? ""} name="slug" />
+                  </label>
+                  <label className="filter-field">
+                    <span>Category</span>
+                    <select defaultValue={shoe.category ?? "road-daily"} name="category" required>
+                      <option value="road-daily">Road daily</option>
+                      <option value="road-workout">Road workout</option>
+                      <option value="road-race">Road race</option>
+                      <option value="trail-daily">Trail daily</option>
+                      <option value="trail-race">Trail race</option>
+                      <option value="track-spikes">Track spikes</option>
+                      <option value="hiking-fastpack">Hiking fastpack</option>
+                    </select>
+                  </label>
+                  <label className="filter-field">
+                    <span>Terrain</span>
+                    <select defaultValue={shoe.terrain ?? "road"} name="terrain" required>
+                      <option value="road">Road</option>
+                      <option value="trail">Trail</option>
+                      <option value="track">Track</option>
+                      <option value="mixed">Mixed</option>
+                    </select>
+                  </label>
+                  <label className="filter-field">
+                    <span>Stability</span>
+                    <select defaultValue={shoe.stability ?? "neutral"} name="stability" required>
+                      <option value="neutral">Neutral</option>
+                      <option value="stability">Stability</option>
+                    </select>
+                  </label>
+                  <label className="filter-field">
+                    <span>Usage summary</span>
+                    <textarea defaultValue={shoe.usageSummary ?? ""} name="usageSummary" rows={3} />
+                  </label>
+                  <button className="button-secondary" type="submit">
+                    Save shoe
+                  </button>
+                </form>
+                <form action={deleteShoeModelAction}>
+                  <input name="shoeId" type="hidden" value={shoe.id} />
+                  <button className="button-secondary" type="submit">
+                    Delete shoe
+                  </button>
+                </form>
+              </details>
+            ))}
+          </div>
+        </article>
+
+        <article className="detail-panel">
+          <p className="feature-kicker">Manage Releases</p>
+          <h2>Edit, fetch, summarize, or delete releases</h2>
+          <div className="editorial-stack">
+            {data.releases.slice(0, 60).map((release) => (
+              <details key={release.id}>
+                <summary className="text-link">
+                  {release.label}
+                  {release.isCurrent ? " · current" : ""}
+                </summary>
+                <form action={updateReleaseAction} className="editorial-form">
+                  <input name="releaseId" type="hidden" value={release.id} />
+                  <label className="filter-field">
+                    <span>Version name</span>
+                    <input defaultValue={release.versionName ?? ""} name="versionName" required />
+                  </label>
+                  <label className="filter-field">
+                    <span>Release year</span>
+                    <input
+                      defaultValue={release.releaseYear ?? ""}
+                      name="releaseYear"
+                      type="number"
+                    />
+                  </label>
+                  <label className="filter-field">
+                    <span>MSRP USD</span>
+                    <input defaultValue={release.msrpUsd ?? ""} name="msrpUsd" step="0.01" type="number" />
+                  </label>
+                  <label className="filter-field checkbox-field">
+                    <span>Current model</span>
+                    <input defaultChecked={release.isCurrent} name="isCurrent" type="checkbox" />
+                  </label>
+                  <label className="filter-field">
+                    <span>Foam</span>
+                    <input defaultValue={release.foam ?? ""} name="foam" />
+                  </label>
+                  <button className="button-secondary" type="submit">
+                    Save release
+                  </button>
+                </form>
+                <div className="card-actions card-actions--dense">
+                  <form action={runBelieveInTheRunCrawlAction}>
+                    <input name="releaseId" type="hidden" value={release.id} />
+                    <button className="button-secondary" type="submit">
+                      Fetch BITR
+                    </button>
+                  </form>
+                  <form action={runRedditRunningShoeGeeksCrawlAction}>
+                    <input name="releaseId" type="hidden" value={release.id} />
+                    <button className="button-secondary" type="submit">
+                      Fetch Reddit
+                    </button>
+                  </form>
+                  <form action={runRunRepeatCrawlAction}>
+                    <input name="releaseId" type="hidden" value={release.id} />
+                    <button className="button-secondary" type="submit">
+                      Fetch RunRepeat
+                    </button>
+                  </form>
+                  <form action={runDoctorsOfRunningCrawlAction}>
+                    <input name="releaseId" type="hidden" value={release.id} />
+                    <button className="button-secondary" type="submit">
+                      Fetch Doctors
+                    </button>
+                  </form>
+                  <form action={generateAiReviewSummaryAction}>
+                    <input name="releaseId" type="hidden" value={release.id} />
+                    <button className="button-secondary" type="submit">
+                      Regenerate AI summary
+                    </button>
+                  </form>
+                  <form action={deleteReleaseAction}>
+                    <input name="releaseId" type="hidden" value={release.id} />
+                    <button className="button-secondary" type="submit">
+                      Delete release
+                    </button>
+                  </form>
+                </div>
+              </details>
+            ))}
+          </div>
         </article>
       </section>
 
@@ -888,7 +1089,11 @@ export default async function InternalPage() {
             <div className="editorial-row" key={review.id}>
               <div>
                 <strong>{review.title ?? "Untitled review"}</strong>
-                <p className="detail-muted">{review.sourceUrl}</p>
+                <p className="detail-muted">
+                  <a className="text-link" href={review.sourceUrl} rel="noreferrer" target="_blank">
+                    Open source
+                  </a>
+                </p>
                 {review.highlights.length ? (
                   <p className="detail-muted">Highlights: {review.highlights.join(", ")}</p>
                 ) : null}
@@ -912,7 +1117,7 @@ export default async function InternalPage() {
                     <input name="reviewId" type="hidden" value={review.id} />
                     <input name="status" type="hidden" value={status} />
                     <button className="button-secondary" type="submit">
-                      {status}
+                      {status === "rejected" ? "Unpublish" : status}
                     </button>
                   </form>
                 ))}

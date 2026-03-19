@@ -74,6 +74,55 @@ export async function createBrandAction(formData: FormData) {
   revalidatePath("/shoes");
 }
 
+export async function updateBrandAction(formData: FormData) {
+  const db = requireDatabase();
+  const brandId = String(formData.get("brandId") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const rawSlug = String(formData.get("slug") ?? "").trim();
+  const websiteUrl = String(formData.get("websiteUrl") ?? "").trim();
+
+  if (!brandId || !name) {
+    throw new Error("Brand id and name are required.");
+  }
+
+  await db
+    .update(brands)
+    .set({
+      name,
+      slug: rawSlug || slugify(name),
+      websiteUrl: websiteUrl || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(brands.id, brandId));
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
+export async function deleteBrandAction(formData: FormData) {
+  const db = requireDatabase();
+  const brandId = String(formData.get("brandId") ?? "").trim();
+
+  if (!brandId) {
+    throw new Error("Brand id is required.");
+  }
+
+  const existingShoes = await db.query.shoes.findMany({
+    where: eq(shoes.brandId, brandId),
+    columns: { id: true },
+    limit: 1,
+  });
+
+  if (existingShoes.length) {
+    throw new Error("Delete the brand's shoes before deleting the brand.");
+  }
+
+  await db.delete(brands).where(eq(brands.id, brandId));
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
 export async function createShoeModelAction(formData: FormData) {
   const db = requireDatabase();
   const brandId = String(formData.get("brandId") ?? "").trim();
@@ -109,6 +158,69 @@ export async function createShoeModelAction(formData: FormData) {
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
+}
+
+export async function updateShoeModelAction(formData: FormData) {
+  const db = requireDatabase();
+  const shoeId = String(formData.get("shoeId") ?? "").trim();
+  const brandId = String(formData.get("brandId") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const rawSlug = String(formData.get("slug") ?? "").trim();
+  const category = String(formData.get("category") ?? "").trim() as
+    | "road-daily"
+    | "road-workout"
+    | "road-race"
+    | "trail-daily"
+    | "trail-race"
+    | "track-spikes"
+    | "hiking-fastpack";
+  const terrain = String(formData.get("terrain") ?? "").trim() as "road" | "trail" | "track" | "mixed";
+  const stability = String(formData.get("stability") ?? "").trim() as "neutral" | "stability";
+  const usageSummary = String(formData.get("usageSummary") ?? "").trim();
+
+  if (!shoeId || !brandId || !name || !category || !terrain || !stability) {
+    throw new Error("Missing required shoe fields.");
+  }
+
+  await db
+    .update(shoes)
+    .set({
+      brandId,
+      name,
+      slug: rawSlug || slugify(name),
+      category,
+      terrain,
+      stability,
+      usageSummary: usageSummary || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(shoes.id, shoeId));
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
+export async function deleteShoeModelAction(formData: FormData) {
+  const db = requireDatabase();
+  const shoeId = String(formData.get("shoeId") ?? "").trim();
+
+  if (!shoeId) {
+    throw new Error("Shoe id is required.");
+  }
+
+  const existing = await db.query.shoes.findFirst({
+    where: eq(shoes.id, shoeId),
+  });
+
+  if (!existing) {
+    throw new Error("Shoe not found.");
+  }
+
+  await db.delete(shoes).where(eq(shoes.id, shoeId));
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+  revalidatePath(`/shoes/${existing.slug}`);
 }
 
 export async function upsertReleaseAction(formData: FormData) {
@@ -231,6 +343,105 @@ export async function upsertReleaseAction(formData: FormData) {
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
+}
+
+export async function updateReleaseAction(formData: FormData) {
+  const db = requireDatabase();
+  const releaseId = String(formData.get("releaseId") ?? "").trim();
+  const versionName = String(formData.get("versionName") ?? "").trim();
+  const releaseYearRaw = String(formData.get("releaseYear") ?? "").trim();
+  const msrpUsd = String(formData.get("msrpUsd") ?? "").trim();
+  const isCurrent = formData.get("isCurrent") === "on";
+  const foam = String(formData.get("foam") ?? "").trim();
+  const weightOzMen = String(formData.get("weightOzMen") ?? "").trim();
+  const dropMmRaw = String(formData.get("dropMm") ?? "").trim();
+
+  if (!releaseId || !versionName) {
+    throw new Error("Release id and version name are required.");
+  }
+
+  const releaseRow = await db
+    .select({
+      id: shoeReleases.id,
+      shoeSlug: shoes.slug,
+    })
+    .from(shoeReleases)
+    .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+    .where(eq(shoeReleases.id, releaseId))
+    .limit(1);
+
+  const release = releaseRow[0];
+  if (!release) {
+    throw new Error("Release not found.");
+  }
+
+  await db
+    .update(shoeReleases)
+    .set({
+      versionName,
+      releaseYear: releaseYearRaw ? Number(releaseYearRaw) : null,
+      msrpUsd: msrpUsd || null,
+      isCurrent,
+      foam: foam || null,
+      updatedAt: new Date(),
+    })
+    .where(eq(shoeReleases.id, releaseId));
+
+  const hasWeight = formData.has("weightOzMen");
+  const hasDrop = formData.has("dropMm");
+
+  if (hasWeight || hasDrop) {
+    const existingSpec = await db.query.shoeSpecs.findFirst({
+      where: eq(shoeSpecs.releaseId, releaseId),
+    });
+    const specValues = {
+      weightOzMen: hasWeight ? (weightOzMen || null) : existingSpec?.weightOzMen ?? null,
+      dropMm: hasDrop ? (dropMmRaw ? Number(dropMmRaw) : null) : existingSpec?.dropMm ?? null,
+    };
+
+    if (existingSpec) {
+      await db.update(shoeSpecs).set(specValues).where(eq(shoeSpecs.releaseId, releaseId));
+    } else {
+      await db.insert(shoeSpecs).values({
+        releaseId,
+        ...specValues,
+      });
+    }
+  }
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+  revalidatePath(`/shoes/${release.shoeSlug}`);
+}
+
+export async function deleteReleaseAction(formData: FormData) {
+  const db = requireDatabase();
+  const releaseId = String(formData.get("releaseId") ?? "").trim();
+
+  if (!releaseId) {
+    throw new Error("Release id is required.");
+  }
+
+  const releaseRow = await db
+    .select({
+      id: shoeReleases.id,
+      shoeSlug: shoes.slug,
+    })
+    .from(shoeReleases)
+    .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+    .where(eq(shoeReleases.id, releaseId))
+    .limit(1);
+
+  const release = releaseRow[0];
+  if (!release) {
+    throw new Error("Release not found.");
+  }
+
+  await db.delete(shoeReleases).where(eq(shoeReleases.id, releaseId));
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+  revalidatePath(`/shoes/${release.shoeSlug}`);
 }
 
 export async function createManualReviewAction(formData: FormData) {

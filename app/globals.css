@@ -320,6 +320,30 @@ a {
   margin-bottom: 1.25rem;
 }
 
+.editorial-stack {
+  display: grid;
+  gap: 0.9rem;
+  max-height: 32rem;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.editorial-stack details {
+  border: 1px solid var(--line);
+  border-radius: 0.95rem;
+  background: rgba(255, 250, 244, 0.7);
+  padding: 0.9rem 1rem;
+}
+
+.editorial-stack summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.editorial-stack details[open] summary {
+  margin-bottom: 0.9rem;
+}
+
 .editorial-table-panel {
   margin-top: 1.5rem;
 }

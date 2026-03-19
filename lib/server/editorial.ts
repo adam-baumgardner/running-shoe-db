@@ -18,11 +18,21 @@ import {
 export interface EditorialBrandOption {
   id: string;
   name: string;
+  slug?: string;
+  websiteUrl?: string | null;
 }
 
 export interface EditorialShoeOption {
   id: string;
   label: string;
+  brandId?: string;
+  brandName?: string;
+  name?: string;
+  slug?: string;
+  category?: string;
+  terrain?: string;
+  stability?: string;
+  usageSummary?: string | null;
 }
 
 export interface EditorialSourceOption {
@@ -37,6 +47,15 @@ export interface EditorialReleaseOption {
   hasAiReviewSummary?: boolean;
   approvedReviewCount?: number;
   aiSummaryStatus?: "missing" | "generated" | "override";
+  shoeId?: string;
+  shoeSlug?: string;
+  brandName?: string;
+  shoeName?: string;
+  versionName?: string;
+  releaseYear?: number | null;
+  isCurrent?: boolean;
+  foam?: string | null;
+  msrpUsd?: number | null;
 }
 
 export interface EditorialReviewRow {
@@ -189,7 +208,15 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
 
   const [brandRows, shoeRows, releaseRows, sourceRows] = await Promise.all([
     safeQuery(
-      db.select({ id: brands.id, name: brands.name }).from(brands).orderBy(brands.name),
+      db
+        .select({
+          id: brands.id,
+          name: brands.name,
+          slug: brands.slug,
+          websiteUrl: brands.websiteUrl,
+        })
+        .from(brands)
+        .orderBy(brands.name),
       [],
       "brand rows",
     ),
@@ -197,8 +224,14 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       db
         .select({
           id: shoes.id,
+          brandId: brands.id,
           brandName: brands.name,
           shoeName: shoes.name,
+          slug: shoes.slug,
+          category: shoes.category,
+          terrain: shoes.terrain,
+          stability: shoes.stability,
+          usageSummary: shoes.usageSummary,
         })
         .from(shoes)
         .innerJoin(brands, eq(shoes.brandId, brands.id))
@@ -210,12 +243,20 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       db
         .select({
           id: shoeReleases.id,
+          shoeId: shoes.id,
+          shoeSlug: shoes.slug,
+          brandName: brands.name,
           shoeName: shoes.name,
           versionName: shoeReleases.versionName,
+          releaseYear: shoeReleases.releaseYear,
+          isCurrent: shoeReleases.isCurrent,
+          foam: shoeReleases.foam,
+          msrpUsd: shoeReleases.msrpUsd,
           metadata: shoeReleases.metadata,
         })
         .from(shoeReleases)
         .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
+        .innerJoin(brands, eq(shoes.brandId, brands.id))
         .orderBy(desc(shoeReleases.releaseYear), shoes.name),
       [],
       "release rows",
@@ -469,12 +510,29 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
     shoes: shoeRows.map((shoe) => ({
       id: shoe.id,
       label: `${shoe.brandName} ${shoe.shoeName}`,
+      brandId: shoe.brandId,
+      brandName: shoe.brandName,
+      name: shoe.shoeName,
+      slug: shoe.slug,
+      category: shoe.category,
+      terrain: shoe.terrain,
+      stability: shoe.stability,
+      usageSummary: shoe.usageSummary,
     })),
     releases: releaseRows.map((release) => ({
       id: release.id,
       label: `${release.shoeName} ${release.versionName}`,
       hasAiReviewSummary: hasAnyAiReviewSummary(release.metadata),
       aiSummaryStatus: getAiReviewSummaryDisplayStatus(release.metadata),
+      shoeId: release.shoeId,
+      shoeSlug: release.shoeSlug,
+      brandName: release.brandName,
+      shoeName: release.shoeName,
+      versionName: release.versionName,
+      releaseYear: release.releaseYear,
+      isCurrent: release.isCurrent,
+      foam: release.foam,
+      msrpUsd: release.msrpUsd ? Number(release.msrpUsd) : null,
     })),
     sources: sourceRows,
     recentReviews: reviewRows.map((review) => ({
