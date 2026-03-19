@@ -108,3 +108,48 @@ Use the existing shoe model set as the baseline, then verify whether each model'
   - Seeded before correction: `14`, `15`
   - Official site confirms `Peregrine 16`
   - Action taken: added `Peregrine 16`, marked `15` no longer current
+
+### HOKA
+- `Mach`
+  - Seeded before correction: `Mach 5`, `Mach 6`
+  - Official HOKA product pages confirm `Mach 7`
+  - Action taken: added `Mach 7`, marked `Mach 6` no longer current
+- `Clifton`
+  - Current seeded latest remains `Clifton 10`
+  - No newer official product confirmed in this pass
+- `Bondi`
+  - Current seeded latest remains `Bondi 9`
+  - No newer official product confirmed in this pass
+- `Arahi`
+  - Current seeded latest remains `Arahi 8`
+  - No newer official product confirmed in this pass
+- `Gaviota`
+  - Current seeded latest remains `Gaviota 6`
+  - No newer official product confirmed in this pass
+- `Cielo X1`
+  - Current seeded latest remains `Cielo X1 2.0`
+  - No newer official product confirmed in this pass
+- `Speedgoat`
+  - Current seeded latest remains `Speedgoat 6`
+  - No newer official product confirmed in this pass
+
+### Brooks
+- `Ghost`
+  - Current seeded latest remains `Ghost 17`
+  - No newer official product confirmed in this pass
+- `Glycerin`
+  - Seeded before correction: `Glycerin 22`
+  - Official site confirms `Glycerin 23`
+  - Action taken: added `Glycerin 23`, marked `22` no longer current
+- `Adrenaline GTS`
+  - Seeded before correction: `Adrenaline GTS 24`
+  - Official site confirms `Adrenaline GTS 25`
+  - Action taken: added `Adrenaline GTS 25`, marked `24` no longer current
+- `Cascadia`
+  - Seeded before correction: `Cascadia 17`, `Cascadia 18`
+  - Official site confirms `Cascadia 19`
+  - Action taken: added `Cascadia 19`, marked `18` no longer current
+- `Hyperion Elite`
+  - Seeded before correction: `Hyperion Elite 4`, `Hyperion Elite 4 PB`
+  - Official site confirms `Hyperion Elite 5`
+  - Action taken: added `Hyperion Elite 5`, marked `Hyperion Elite 4 PB` no longer current
