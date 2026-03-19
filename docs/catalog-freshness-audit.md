@@ -172,3 +172,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `Brooks Ghost Max`
   - Official site confirms current `Ghost Max 3`
   - Added baseline releases: `Ghost Max 2`, `Ghost Max 3`
+- `Brooks Hyperion Max`
+  - Official site confirms current `Hyperion Max 3`
+  - Added baseline releases: `Hyperion Max 2`, `Hyperion Max 3`
