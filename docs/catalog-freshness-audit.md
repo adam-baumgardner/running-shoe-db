@@ -153,3 +153,19 @@ Use the existing shoe model set as the baseline, then verify whether each model'
   - Seeded before correction: `Hyperion Elite 4`, `Hyperion Elite 4 PB`
   - Official site confirms `Hyperion Elite 5`
   - Action taken: added `Hyperion Elite 5`, marked `Hyperion Elite 4 PB` no longer current
+
+## Broad Missed-Model Sweep
+
+### Added In This Sweep
+- `New Balance Fresh Foam X Hierro`
+  - Official site confirms current `Fresh Foam X Hierro v9`
+  - Added baseline releases: `v8`, `v9`
+- `Nike Structure`
+  - Official Nike product pages confirm current `Structure 26`
+  - Added baseline releases: `Structure 25`, `Structure 26`
+- `ASICS GEL-Cumulus`
+  - Official site confirms current `GEL-Cumulus 27`
+  - Added baseline releases: `GEL-Cumulus 26`, `GEL-Cumulus 27`
+- `Saucony Kinvara`
+  - Official site confirms current `Kinvara 16`
+  - Added baseline releases: `Kinvara 15`, `Kinvara 16`
