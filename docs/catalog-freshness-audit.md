@@ -193,3 +193,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `Nike Zegama`
   - Official site confirms current `Zegama 2`
   - Added baseline releases: `Zegama`, `Zegama 2`
+- `Brooks Glycerin GTS`
+  - Official site confirms current `Glycerin GTS 22`
+  - Added baseline releases: `Glycerin GTS 21`, `Glycerin GTS 22`
