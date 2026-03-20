@@ -199,3 +199,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `HOKA Challenger`
   - Official HOKA product pages confirm current `Challenger 8`
   - Added baseline releases: `Challenger 7`, `Challenger 8`
+- `Brooks Catamount`
+  - Official site confirms current `Catamount 4`
+  - Added baseline releases: `Catamount 3`, `Catamount 4`
