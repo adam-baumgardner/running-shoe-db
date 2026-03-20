@@ -187,3 +187,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `Saucony Hurricane`
   - Official site confirms current `Hurricane 25`
   - Added baseline releases: `Hurricane 24`, `Hurricane 25`
+- `ASICS Magic Speed`
+  - Official site confirms current `MAGIC SPEED 5`
+  - Added baseline releases: `MAGIC SPEED 4`, `MAGIC SPEED 5`
