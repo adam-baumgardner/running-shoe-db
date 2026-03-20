@@ -178,3 +178,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `Nike Invincible`
   - Official site confirms current `Invincible 3`
   - Added baseline releases: `Invincible 2`, `Invincible 3`
+- `Brooks Launch`
+  - Official site confirms current `Launch 11`
+  - Added baseline releases: `Launch 10`, `Launch 11`

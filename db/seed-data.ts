@@ -617,6 +617,15 @@ export const seedShoes: SeedShoe[] = [
     usageSummary: "Protective fast training for runners who want super-trainer cushioning and a plated workout feel.",
   },
   {
+    brandSlug: "brooks",
+    name: "Launch",
+    slug: "brooks-launch",
+    category: "road-workout",
+    stability: "neutral",
+    terrain: "road",
+    usageSummary: "Lightweight everyday speedwork for runners who want a simpler, lower-cost uptempo trainer.",
+  },
+  {
     brandSlug: "puma",
     name: "FAST-R NITRO Elite",
     slug: "puma-fast-r-nitro-elite",
@@ -1929,6 +1938,26 @@ export const seedReleases: SeedRelease[] = [
     notes: "Current Brooks super-trainer adds PEBA cushioning up top for a softer, faster long-run and workout ride.",
   },
   {
+    shoeSlug: "brooks-launch",
+    versionName: "Launch 10",
+    releaseYear: 2024,
+    msrpUsd: "110.00",
+    isCurrent: false,
+    isPlated: false,
+    foam: "DNA Flash",
+    notes: "Previous lightweight Brooks trainer aimed at runners who want a simpler, more direct speed-day option.",
+  },
+  {
+    shoeSlug: "brooks-launch",
+    versionName: "Launch 11",
+    releaseYear: 2025,
+    msrpUsd: "120.00",
+    isCurrent: true,
+    isPlated: false,
+    foam: "DNA Flash v2",
+    notes: "Current Launch keeps the lightweight uptempo role with a smoother forefoot and more energetic toe-off.",
+  },
+  {
     shoeSlug: "puma-fast-r-nitro-elite",
     versionName: "FAST-R NITRO Elite 2",
     releaseYear: 2024,
@@ -2990,6 +3019,22 @@ export const seedSpecs: SeedSpec[] = [
     forefootStackMm: 38,
     dropMm: 6,
     fitNotes: "Current Hyperion Max keeps a locked-in workout fit with more protection underfoot for long fast sessions.",
+  },
+  {
+    releaseKey: "brooks-launch:Launch 10",
+    weightOzMen: "8.1",
+    heelStackMm: 35,
+    forefootStackMm: 27,
+    dropMm: 8,
+    fitNotes: "Light, stripped-back fit built for faster training days and runners who prefer a simpler shoe.",
+  },
+  {
+    releaseKey: "brooks-launch:Launch 11",
+    weightOzMen: "7.7",
+    heelStackMm: 35,
+    forefootStackMm: 27,
+    dropMm: 8,
+    fitNotes: "Current Launch keeps a snug fast-day fit with a breathable upper and light, versatile cushioning.",
   },
   {
     releaseKey: "puma-fast-r-nitro-elite:FAST-R NITRO Elite 2",
@@ -4211,9 +4256,28 @@ const recentReviewDateOverrides: Record<string, string> = {
 
 export const seedReviews: SeedReview[] = baseSeedReviews.map((review) => {
   const overrideKey = `${review.releaseKey}:${review.sourceSlug}`;
-  const sourceUrl = review.sourceUrl.startsWith(PLACEHOLDER_REVIEW_URL_PREFIX)
-    ? reviewSourceSiteUrlBySlug[review.sourceSlug] ?? review.sourceUrl
-    : review.sourceUrl;
+  const sourceUrl = (() => {
+    if (!review.sourceUrl.startsWith(PLACEHOLDER_REVIEW_URL_PREFIX)) {
+      return review.sourceUrl;
+    }
+
+    const sourceSiteUrl = reviewSourceSiteUrlBySlug[review.sourceSlug];
+    if (!sourceSiteUrl) {
+      return review.sourceUrl;
+    }
+
+    const placeholderSlug = review.sourceUrl.slice(PLACEHOLDER_REVIEW_URL_PREFIX.length);
+
+    try {
+      const sourceSite = new URL(sourceSiteUrl);
+      sourceSite.pathname = `/seed-reviews/${placeholderSlug}`;
+      sourceSite.search = "";
+      sourceSite.hash = "";
+      return sourceSite.toString();
+    } catch {
+      return `${sourceSiteUrl.replace(/\/$/, "")}/seed-reviews/${placeholderSlug}`;
+    }
+  })();
 
   return {
     ...review,

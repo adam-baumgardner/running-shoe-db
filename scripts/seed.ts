@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { closeDbConnection, getDb } from "../db";
 import {
   seedBrands,
@@ -212,9 +212,17 @@ async function main() {
     if (!releaseId) throw new Error(`Missing release for review ${review.sourceUrl}`);
 
     const authorId = authorIdByKey.get(`${sourceId}:${review.authorName}`) ?? null;
-    const existingReview = await db.query.reviews.findFirst({
-      where: eq(reviews.sourceUrl, review.sourceUrl),
-    });
+    const existingReview =
+      (await db.query.reviews.findFirst({
+        where: eq(reviews.sourceUrl, review.sourceUrl),
+      })) ??
+      (await db.query.reviews.findFirst({
+        where: and(
+          eq(reviews.sourceId, sourceId),
+          eq(reviews.releaseId, releaseId),
+          eq(reviews.title, review.title)
+        ),
+      }));
 
     const values = {
       releaseId,
