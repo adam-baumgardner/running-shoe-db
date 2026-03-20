@@ -190,3 +190,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `ASICS Magic Speed`
   - Official site confirms current `MAGIC SPEED 5`
   - Added baseline releases: `MAGIC SPEED 4`, `MAGIC SPEED 5`
+- `Nike Zegama`
+  - Official site confirms current `Zegama 2`
+  - Added baseline releases: `Zegama`, `Zegama 2`
