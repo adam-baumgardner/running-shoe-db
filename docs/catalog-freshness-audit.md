@@ -196,3 +196,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `Brooks Glycerin GTS`
   - Official site confirms current `Glycerin GTS 22`
   - Added baseline releases: `Glycerin GTS 21`, `Glycerin GTS 22`
+- `HOKA Challenger`
+  - Official HOKA product pages confirm current `Challenger 8`
+  - Added baseline releases: `Challenger 7`, `Challenger 8`
