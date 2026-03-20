@@ -184,3 +184,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `Brooks Beast GTS`
   - Official site confirms current `Beast GTS 24`
   - Added baseline releases: `Beast GTS 23`, `Beast GTS 24`
+- `Saucony Hurricane`
+  - Official site confirms current `Hurricane 25`
+  - Added baseline releases: `Hurricane 24`, `Hurricane 25`
