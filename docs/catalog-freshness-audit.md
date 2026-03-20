@@ -181,3 +181,6 @@ Use the existing shoe model set as the baseline, then verify whether each model'
 - `Brooks Launch`
   - Official site confirms current `Launch 11`
   - Added baseline releases: `Launch 10`, `Launch 11`
+- `Brooks Beast GTS`
+  - Official site confirms current `Beast GTS 24`
+  - Added baseline releases: `Beast GTS 23`, `Beast GTS 24`
