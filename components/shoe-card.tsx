@@ -7,7 +7,7 @@ interface ShoeCardProps {
 
 export function ShoeCard({ shoe }: ShoeCardProps) {
   const releaseHref = `/shoes/${shoe.slug}/${shoe.releaseSlug}`;
-  const summary = shoe.aiReviewSummary?.overview ?? shoe.reviewIntelligence.summary;
+  const summary = shoe.aiReviewSummary?.overview ?? shoe.reviewIntelligence.buyerSignal ?? null;
 
   return (
     <article className="catalog-row">
