@@ -1,6 +1,6 @@
 import { count, desc, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { brands, crawlRuns, crawlSources, reviewSources, reviews, shoeReleases, shoes, shoeSpecs } from "@/db/schema";
+import { brands, crawlRuns, crawlSources, reviewSources, reviews, shoeReleases, shoeSpecVariants, shoes, shoeSpecs } from "@/db/schema";
 import { assessCrawlDueState } from "@/lib/ingestion/scheduler";
 import {
   getAiReviewSummaryHistory,
@@ -67,6 +67,21 @@ export interface EditorialReleaseOption {
   dropMm?: number | null;
   fitNotes?: string | null;
   sourceNotes?: string | null;
+  specVariants?: Array<{
+    id: string;
+    variantKey: string;
+    displayLabel: string;
+    audience: "mens" | "womens" | "unisex" | "other" | "unknown";
+    isPrimary: boolean;
+    weightOz: number | null;
+    heelStackMm: number | null;
+    forefootStackMm: number | null;
+    dropMm: number | null;
+    fitNotes: string | null;
+    sourceNotes: string | null;
+    sourceUrl: string | null;
+    sourceLabel: string | null;
+  }>;
 }
 
 export interface EditorialReviewRow {
@@ -297,6 +312,50 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       "source rows",
     ),
   ]);
+
+  const specVariantRows = await safeQuery(
+    db
+      .select({
+        id: shoeSpecVariants.id,
+        releaseId: shoeSpecVariants.releaseId,
+        variantKey: shoeSpecVariants.variantKey,
+        displayLabel: shoeSpecVariants.displayLabel,
+        audience: shoeSpecVariants.audience,
+        isPrimary: shoeSpecVariants.isPrimary,
+        weightOz: shoeSpecVariants.weightOz,
+        heelStackMm: shoeSpecVariants.heelStackMm,
+        forefootStackMm: shoeSpecVariants.forefootStackMm,
+        dropMm: shoeSpecVariants.dropMm,
+        fitNotes: shoeSpecVariants.fitNotes,
+        sourceNotes: shoeSpecVariants.sourceNotes,
+        sourceUrl: shoeSpecVariants.sourceUrl,
+        sourceLabel: shoeSpecVariants.sourceLabel,
+      })
+      .from(shoeSpecVariants),
+    [],
+    "spec variants",
+  );
+
+  const specVariantsByReleaseId = new Map<string, EditorialReleaseOption["specVariants"]>();
+  for (const variant of specVariantRows) {
+    const current = specVariantsByReleaseId.get(variant.releaseId) ?? [];
+    current.push({
+      id: variant.id,
+      variantKey: variant.variantKey,
+      displayLabel: variant.displayLabel,
+      audience: variant.audience,
+      isPrimary: variant.isPrimary,
+      weightOz: variant.weightOz ? Number(variant.weightOz) : null,
+      heelStackMm: variant.heelStackMm,
+      forefootStackMm: variant.forefootStackMm,
+      dropMm: variant.dropMm,
+      fitNotes: variant.fitNotes,
+      sourceNotes: variant.sourceNotes,
+      sourceUrl: variant.sourceUrl,
+      sourceLabel: variant.sourceLabel,
+    });
+    specVariantsByReleaseId.set(variant.releaseId, current);
+  }
 
   const [reviewRows, recentReleaseRows, coverageRows, crawlSourceRows, crawlRunRows] =
     await Promise.all([
@@ -564,6 +623,7 @@ export async function getEditorialDashboardData(): Promise<EditorialDashboardDat
       dropMm: release.dropMm,
       fitNotes: release.fitNotes,
       sourceNotes: release.sourceNotes,
+      specVariants: specVariantsByReleaseId.get(release.id) ?? [],
     })),
     sources: sourceRows,
     recentReviews: reviewRows.map((review) => ({

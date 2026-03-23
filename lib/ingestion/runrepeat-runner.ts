@@ -10,6 +10,7 @@ import {
   reviews,
   reviewSources,
   shoeReleases,
+  shoeSpecVariants,
   shoes,
   shoeSpecs,
 } from "@/db/schema";
@@ -461,32 +462,63 @@ async function upsertRunRepeatSpecs(
   }
 
   const db = getDb();
-  const existing = await db.query.shoeSpecs.findFirst({
-    where: eq(shoeSpecs.releaseId, releaseId),
+  const existing = await db.query.shoeSpecVariants.findFirst({
+    where: and(eq(shoeSpecVariants.releaseId, releaseId), eq(shoeSpecVariants.variantKey, "default")),
   });
 
   if (!existing) {
-    await db.insert(shoeSpecs).values({
+    await db.insert(shoeSpecVariants).values({
       releaseId,
-      weightOzMen: specs.weightOzMen,
+      variantKey: "default",
+      displayLabel: "Default",
+      audience: "unknown",
+      isPrimary: true,
+      weightOz: specs.weightOzMen,
       heelStackMm: specs.heelStackMm,
       forefootStackMm: specs.forefootStackMm,
       dropMm: specs.dropMm,
       sourceNotes: "RunRepeat lab measurements imported automatically.",
     });
-    return;
+  } else {
+    await db
+      .update(shoeSpecVariants)
+      .set({
+        weightOz: existing.weightOz ?? specs.weightOzMen,
+        heelStackMm: existing.heelStackMm ?? specs.heelStackMm,
+        forefootStackMm: existing.forefootStackMm ?? specs.forefootStackMm,
+        dropMm: existing.dropMm ?? specs.dropMm,
+        sourceNotes:
+          existing.sourceNotes ??
+          "RunRepeat lab measurements imported automatically.",
+      })
+      .where(eq(shoeSpecVariants.id, existing.id));
   }
 
+  const legacy = await db.query.shoeSpecs.findFirst({
+    where: eq(shoeSpecs.releaseId, releaseId),
+  });
+  const legacyValues = {
+    weightOzMen: specs.weightOzMen,
+    heelStackMm: specs.heelStackMm,
+    forefootStackMm: specs.forefootStackMm,
+    dropMm: specs.dropMm,
+    sourceNotes: "RunRepeat lab measurements imported automatically.",
+  };
+  if (!legacy) {
+    await db.insert(shoeSpecs).values({
+      releaseId,
+      ...legacyValues,
+    });
+    return;
+  }
   await db
     .update(shoeSpecs)
     .set({
-      weightOzMen: existing.weightOzMen ?? specs.weightOzMen,
-      heelStackMm: existing.heelStackMm ?? specs.heelStackMm,
-      forefootStackMm: existing.forefootStackMm ?? specs.forefootStackMm,
-      dropMm: existing.dropMm ?? specs.dropMm,
-      sourceNotes:
-        existing.sourceNotes ??
-        "RunRepeat lab measurements imported automatically.",
+      weightOzMen: legacy.weightOzMen ?? specs.weightOzMen,
+      heelStackMm: legacy.heelStackMm ?? specs.heelStackMm,
+      forefootStackMm: legacy.forefootStackMm ?? specs.forefootStackMm,
+      dropMm: legacy.dropMm ?? specs.dropMm,
+      sourceNotes: legacy.sourceNotes ?? "RunRepeat lab measurements imported automatically.",
     })
     .where(eq(shoeSpecs.releaseId, releaseId));
 }

@@ -7,6 +7,7 @@ import {
   deleteReleaseAction,
   deleteReviewSourceAction,
   deleteShoeModelAction,
+  deleteSpecVariantAction,
   generateAiReviewSummaryAction,
   generateMissingAiReviewSummariesAction,
   runBelieveInTheRunCrawlAction,
@@ -24,6 +25,7 @@ import {
   updateReleaseAction,
   updateShoeModelAction,
   upsertReleaseAction,
+  upsertSpecVariantAction,
 } from "@/app/internal/actions";
 import { getImporterByKey } from "@/lib/ingestion";
 import { getEditorialDashboardData } from "@/lib/server/editorial";
@@ -254,7 +256,7 @@ export default async function InternalPage() {
                     <input defaultValue={release.foam ?? ""} name="foam" />
                   </label>
                   <label className="filter-field">
-                    <span>Weight (men, oz)</span>
+                    <span>Default weight (oz)</span>
                     <input defaultValue={release.weightOzMen ?? ""} name="weightOzMen" step="0.1" type="number" />
                   </label>
                   <label className="filter-field">
@@ -290,6 +292,130 @@ export default async function InternalPage() {
                     Save release
                   </button>
                 </form>
+                <div className="editorial-stack">
+                  {(release.specVariants ?? []).map((variant) => (
+                    <details key={variant.id}>
+                      <summary className="text-link">
+                        {variant.displayLabel} · {variant.audience}
+                        {variant.isPrimary ? " · primary" : ""}
+                      </summary>
+                      <form action={upsertSpecVariantAction} className="editorial-form">
+                        <input name="releaseId" type="hidden" value={release.id} />
+                        <input name="variantId" type="hidden" value={variant.id} />
+                        <label className="filter-field">
+                          <span>Variant key</span>
+                          <input defaultValue={variant.variantKey} name="variantKey" required />
+                        </label>
+                        <label className="filter-field">
+                          <span>Display label</span>
+                          <input defaultValue={variant.displayLabel} name="displayLabel" required />
+                        </label>
+                        <label className="filter-field">
+                          <span>Audience</span>
+                          <select defaultValue={variant.audience} name="audience">
+                            <option value="unknown">Unknown</option>
+                            <option value="mens">Men</option>
+                            <option value="womens">Women</option>
+                            <option value="unisex">Unisex</option>
+                            <option value="other">Other</option>
+                          </select>
+                        </label>
+                        <label className="filter-field checkbox-field">
+                          <span>Primary/default variant</span>
+                          <input defaultChecked={variant.isPrimary} name="isPrimary" type="checkbox" />
+                        </label>
+                        <label className="filter-field">
+                          <span>Weight (oz)</span>
+                          <input defaultValue={variant.weightOz ?? ""} name="weightOz" step="0.1" type="number" />
+                        </label>
+                        <label className="filter-field">
+                          <span>Heel stack</span>
+                          <input defaultValue={variant.heelStackMm ?? ""} name="heelStackMm" step="1" type="number" />
+                        </label>
+                        <label className="filter-field">
+                          <span>Forefoot stack</span>
+                          <input defaultValue={variant.forefootStackMm ?? ""} name="forefootStackMm" step="1" type="number" />
+                        </label>
+                        <label className="filter-field">
+                          <span>Drop</span>
+                          <input defaultValue={variant.dropMm ?? ""} name="dropMm" step="1" type="number" />
+                        </label>
+                        <label className="filter-field">
+                          <span>Fit notes</span>
+                          <textarea defaultValue={variant.fitNotes ?? ""} name="fitNotes" rows={3} />
+                        </label>
+                        <label className="filter-field">
+                          <span>Source notes</span>
+                          <textarea defaultValue={variant.sourceNotes ?? ""} name="sourceNotes" rows={3} />
+                        </label>
+                        <label className="filter-field">
+                          <span>Source URL</span>
+                          <input defaultValue={variant.sourceUrl ?? ""} name="sourceUrl" type="url" />
+                        </label>
+                        <label className="filter-field">
+                          <span>Source label</span>
+                          <input defaultValue={variant.sourceLabel ?? ""} name="sourceLabel" />
+                        </label>
+                        <button className="button-secondary" type="submit">
+                          Save spec variant
+                        </button>
+                      </form>
+                      <form action={deleteSpecVariantAction}>
+                        <input name="variantId" type="hidden" value={variant.id} />
+                        <button className="button-secondary" type="submit">
+                          Delete spec variant
+                        </button>
+                      </form>
+                    </details>
+                  ))}
+                  <details>
+                    <summary className="text-link">Add spec variant</summary>
+                    <form action={upsertSpecVariantAction} className="editorial-form">
+                      <input name="releaseId" type="hidden" value={release.id} />
+                      <label className="filter-field">
+                        <span>Variant key</span>
+                        <input name="variantKey" placeholder="mens" required />
+                      </label>
+                      <label className="filter-field">
+                        <span>Display label</span>
+                        <input name="displayLabel" placeholder="Men" required />
+                      </label>
+                      <label className="filter-field">
+                        <span>Audience</span>
+                        <select defaultValue="unknown" name="audience">
+                          <option value="unknown">Unknown</option>
+                          <option value="mens">Men</option>
+                          <option value="womens">Women</option>
+                          <option value="unisex">Unisex</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </label>
+                      <label className="filter-field checkbox-field">
+                        <span>Primary/default variant</span>
+                        <input name="isPrimary" type="checkbox" />
+                      </label>
+                      <label className="filter-field">
+                        <span>Weight (oz)</span>
+                        <input name="weightOz" step="0.1" type="number" />
+                      </label>
+                      <label className="filter-field">
+                        <span>Heel stack</span>
+                        <input name="heelStackMm" step="1" type="number" />
+                      </label>
+                      <label className="filter-field">
+                        <span>Forefoot stack</span>
+                        <input name="forefootStackMm" step="1" type="number" />
+                      </label>
+                      <label className="filter-field">
+                        <span>Drop</span>
+                        <input name="dropMm" step="1" type="number" />
+                      </label>
+                      <button className="button-secondary" type="submit">
+                        Add spec variant
+                      </button>
+                    </form>
+                  </details>
+                </div>
                 <div className="card-actions card-actions--dense">
                   <form action={runBelieveInTheRunCrawlAction}>
                     <input name="releaseId" type="hidden" value={release.id} />

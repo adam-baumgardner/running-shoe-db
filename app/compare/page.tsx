@@ -3,7 +3,7 @@ import { CompareSelector } from "@/components/compare-selector";
 import { getCatalogCards, getComparisonPageData } from "@/lib/server/catalog";
 
 interface ComparePageProps {
-  searchParams: Promise<{ release?: string | string[]; shoe?: string | string[] }>;
+  searchParams: Promise<{ release?: string | string[]; shoe?: string | string[]; variant?: string | string[] }>;
 }
 
 export default async function ComparePage({ searchParams }: ComparePageProps) {
@@ -13,9 +13,22 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
     : resolvedSearchParams.release
       ? [resolvedSearchParams.release]
       : [];
+  const selectedVariantEntries = Array.isArray(resolvedSearchParams.variant)
+    ? resolvedSearchParams.variant
+    : resolvedSearchParams.variant
+      ? [resolvedSearchParams.variant]
+      : [];
+  const selectedVariantKeysByReleaseId = Object.fromEntries(
+    selectedVariantEntries
+      .map((entry) => {
+        const [releaseId, variantKey] = entry.split(":");
+        return releaseId && variantKey ? [releaseId, variantKey] : null;
+      })
+      .filter((entry): entry is [string, string] => Boolean(entry))
+  );
   const [catalog, comparison] = await Promise.all([
     getCatalogCards(),
-    getComparisonPageData(selectedReleaseIds),
+    getComparisonPageData(selectedReleaseIds, selectedVariantKeysByReleaseId),
   ]);
   const selectedRows = comparison.rows;
   const releaseOptions = catalog.map((shoe) => ({
@@ -98,6 +111,17 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
       ),
     },
   ];
+  const buildVariantHref = (releaseId: string, variantKey: string) => {
+    const params = new URLSearchParams();
+    selectedReleaseIds.forEach((id) => params.append("release", id));
+    Object.entries({
+      ...selectedVariantKeysByReleaseId,
+      [releaseId]: variantKey,
+    }).forEach(([id, key]) => {
+      params.append("variant", `${id}:${key}`);
+    });
+    return `/compare?${params.toString()}`;
+  };
 
   return (
     <main className="page-shell">
@@ -170,7 +194,26 @@ export default async function ComparePage({ searchParams }: ComparePageProps) {
                             {shoe.brand} {shoe.release}
                           </strong>
                           <span>{shoe.rideProfile}</span>
-                          <Link className="text-link text-link--compact" href={`/shoes/${shoe.slug}/${shoe.releaseSlug}`}>
+                          {shoe.showSpecVariantToggle ? (
+                            <div className="detail-chip-row">
+                              {shoe.specVariants
+                                .filter((variant) => variant.audience === "mens" || variant.audience === "womens")
+                                .map((variant) => (
+                                  <Link
+                                    className="text-link text-link--compact"
+                                    href={buildVariantHref(shoe.id, variant.variantKey)}
+                                    key={variant.id}
+                                  >
+                                    {variant.displayLabel}
+                                    {shoe.selectedSpecVariant?.variantKey === variant.variantKey ? " selected" : ""}
+                                  </Link>
+                                ))}
+                            </div>
+                          ) : null}
+                          <Link
+                            className="text-link text-link--compact"
+                            href={`/shoes/${shoe.slug}/${shoe.releaseSlug}${shoe.selectedSpecVariant ? `?variant=${shoe.selectedSpecVariant.variantKey}` : ""}`}
+                          >
                             Open shoe
                           </Link>
                         </div>

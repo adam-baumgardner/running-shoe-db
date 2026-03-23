@@ -17,6 +17,7 @@ import {
   reviews,
   reviewSources,
   shoeReleases,
+  shoeSpecVariants,
   shoes,
   shoeSpecs,
 } from "@/db/schema";
@@ -27,6 +28,41 @@ function requireDatabase() {
   }
 
   return getDb();
+}
+
+async function syncPrimaryVariantShadow(
+  releaseId: string,
+  values: {
+    weightOz: string | null;
+    heelStackMm: number | null;
+    forefootStackMm: number | null;
+    dropMm: number | null;
+    fitNotes: string | null;
+    sourceNotes: string | null;
+  },
+) {
+  const db = requireDatabase();
+  const existingSpec = await db.query.shoeSpecs.findFirst({
+    where: eq(shoeSpecs.releaseId, releaseId),
+  });
+
+  const legacyValues = {
+    weightOzMen: values.weightOz,
+    heelStackMm: values.heelStackMm,
+    forefootStackMm: values.forefootStackMm,
+    dropMm: values.dropMm,
+    fitNotes: values.fitNotes,
+    sourceNotes: values.sourceNotes,
+  };
+
+  if (existingSpec) {
+    await db.update(shoeSpecs).set(legacyValues).where(eq(shoeSpecs.releaseId, releaseId));
+  } else {
+    await db.insert(shoeSpecs).values({
+      releaseId,
+      ...legacyValues,
+    });
+  }
 }
 
 export async function createReviewSourceAction(formData: FormData) {
@@ -387,12 +423,15 @@ export async function upsertReleaseAction(formData: FormData) {
     throw new Error("Unable to resolve release id.");
   }
 
-  const existingSpec = await db.query.shoeSpecs.findFirst({
-    where: eq(shoeSpecs.releaseId, resolvedReleaseId),
+  const existingSpec = await db.query.shoeSpecVariants.findFirst({
+    where: and(eq(shoeSpecVariants.releaseId, resolvedReleaseId), eq(shoeSpecVariants.variantKey, "default")),
   });
 
   const specValues = {
-    weightOzMen: weightOzMen || null,
+    displayLabel: "Default",
+    audience: "unknown" as const,
+    isPrimary: true,
+    weightOz: weightOzMen || null,
     heelStackMm: heelStackMmRaw ? Number(heelStackMmRaw) : null,
     forefootStackMm: forefootStackMmRaw ? Number(forefootStackMmRaw) : null,
     dropMm: dropMmRaw ? Number(dropMmRaw) : null,
@@ -401,13 +440,23 @@ export async function upsertReleaseAction(formData: FormData) {
   };
 
   if (existingSpec) {
-    await db.update(shoeSpecs).set(specValues).where(eq(shoeSpecs.releaseId, resolvedReleaseId));
+    await db.update(shoeSpecVariants).set(specValues).where(eq(shoeSpecVariants.id, existingSpec.id));
   } else {
-    await db.insert(shoeSpecs).values({
+    await db.insert(shoeSpecVariants).values({
+      variantKey: "default",
       releaseId: resolvedReleaseId,
       ...specValues,
     });
   }
+
+  await syncPrimaryVariantShadow(resolvedReleaseId, {
+    weightOz: specValues.weightOz,
+    heelStackMm: specValues.heelStackMm,
+    forefootStackMm: specValues.forefootStackMm,
+    dropMm: specValues.dropMm,
+    fitNotes: specValues.fitNotes,
+    sourceNotes: specValues.sourceNotes,
+  });
 
   revalidatePath("/internal");
   revalidatePath("/shoes");
@@ -471,11 +520,14 @@ export async function updateReleaseAction(formData: FormData) {
   const hasSourceNotes = formData.has("sourceNotes");
 
   if (hasWeight || hasHeel || hasForefoot || hasDrop || hasFitNotes || hasSourceNotes) {
-    const existingSpec = await db.query.shoeSpecs.findFirst({
-      where: eq(shoeSpecs.releaseId, releaseId),
+    const existingSpec = await db.query.shoeSpecVariants.findFirst({
+      where: and(eq(shoeSpecVariants.releaseId, releaseId), eq(shoeSpecVariants.variantKey, "default")),
     });
     const specValues = {
-      weightOzMen: hasWeight ? (weightOzMen || null) : existingSpec?.weightOzMen ?? null,
+      displayLabel: existingSpec?.displayLabel ?? "Default",
+      audience: existingSpec?.audience ?? "unknown",
+      isPrimary: existingSpec?.isPrimary ?? true,
+      weightOz: hasWeight ? (weightOzMen || null) : existingSpec?.weightOz ?? null,
       heelStackMm: hasHeel ? (heelStackMmRaw ? Number(heelStackMmRaw) : null) : existingSpec?.heelStackMm ?? null,
       forefootStackMm: hasForefoot
         ? (forefootStackMmRaw ? Number(forefootStackMmRaw) : null)
@@ -486,11 +538,23 @@ export async function updateReleaseAction(formData: FormData) {
     };
 
     if (existingSpec) {
-      await db.update(shoeSpecs).set(specValues).where(eq(shoeSpecs.releaseId, releaseId));
+      await db.update(shoeSpecVariants).set(specValues).where(eq(shoeSpecVariants.id, existingSpec.id));
     } else {
-      await db.insert(shoeSpecs).values({
+      await db.insert(shoeSpecVariants).values({
         releaseId,
+        variantKey: "default",
         ...specValues,
+      });
+    }
+
+    if (specValues.isPrimary) {
+      await syncPrimaryVariantShadow(releaseId, {
+        weightOz: specValues.weightOz,
+        heelStackMm: specValues.heelStackMm,
+        forefootStackMm: specValues.forefootStackMm,
+        dropMm: specValues.dropMm,
+        fitNotes: specValues.fitNotes,
+        sourceNotes: specValues.sourceNotes,
       });
     }
   }
@@ -528,6 +592,135 @@ export async function deleteReleaseAction(formData: FormData) {
   revalidatePath("/internal");
   revalidatePath("/shoes");
   revalidatePath(`/shoes/${release.shoeSlug}`);
+}
+
+export async function upsertSpecVariantAction(formData: FormData) {
+  const db = requireDatabase();
+  const releaseId = String(formData.get("releaseId") ?? "").trim();
+  const variantId = String(formData.get("variantId") ?? "").trim();
+  const variantKey = String(formData.get("variantKey") ?? "").trim() || "default";
+  const displayLabel = String(formData.get("displayLabel") ?? "").trim() || "Default";
+  const audience = String(formData.get("audience") ?? "").trim() as "mens" | "womens" | "unisex" | "other" | "unknown";
+  const isPrimary = formData.get("isPrimary") === "on";
+  const weightOz = String(formData.get("weightOz") ?? "").trim();
+  const heelStackMmRaw = String(formData.get("heelStackMm") ?? "").trim();
+  const forefootStackMmRaw = String(formData.get("forefootStackMm") ?? "").trim();
+  const dropMmRaw = String(formData.get("dropMm") ?? "").trim();
+  const fitNotes = String(formData.get("fitNotes") ?? "").trim();
+  const sourceNotes = String(formData.get("sourceNotes") ?? "").trim();
+  const sourceUrl = String(formData.get("sourceUrl") ?? "").trim();
+  const sourceLabel = String(formData.get("sourceLabel") ?? "").trim();
+
+  if (!releaseId) {
+    throw new Error("Release id is required.");
+  }
+
+  if (!variantId && !variantKey) {
+    throw new Error("Variant key is required.");
+  }
+
+  const payload = {
+    releaseId,
+    variantKey,
+    displayLabel,
+    audience: audience || "unknown",
+    isPrimary,
+    weightOz: weightOz || null,
+    heelStackMm: heelStackMmRaw ? Number(heelStackMmRaw) : null,
+    forefootStackMm: forefootStackMmRaw ? Number(forefootStackMmRaw) : null,
+    dropMm: dropMmRaw ? Number(dropMmRaw) : null,
+    fitNotes: fitNotes || null,
+    sourceNotes: sourceNotes || null,
+    sourceUrl: sourceUrl || null,
+    sourceLabel: sourceLabel || null,
+    updatedAt: new Date(),
+  };
+
+  let resolvedVariantId = variantId;
+  if (variantId) {
+    await db.update(shoeSpecVariants).set(payload).where(eq(shoeSpecVariants.id, variantId));
+  } else {
+    const inserted = await db
+      .insert(shoeSpecVariants)
+      .values(payload)
+      .onConflictDoUpdate({
+        target: [shoeSpecVariants.releaseId, shoeSpecVariants.variantKey],
+        set: payload,
+      })
+      .returning({ id: shoeSpecVariants.id });
+    resolvedVariantId = inserted[0]?.id ?? "";
+  }
+
+  if (isPrimary) {
+    await db
+      .update(shoeSpecVariants)
+      .set({ isPrimary: false, updatedAt: new Date() })
+      .where(and(eq(shoeSpecVariants.releaseId, releaseId), eq(shoeSpecVariants.isPrimary, true)));
+    await db
+      .update(shoeSpecVariants)
+      .set({ isPrimary: true, updatedAt: new Date() })
+      .where(variantId ? eq(shoeSpecVariants.id, variantId) : and(eq(shoeSpecVariants.releaseId, releaseId), eq(shoeSpecVariants.variantKey, variantKey)));
+
+    await syncPrimaryVariantShadow(releaseId, {
+      weightOz: payload.weightOz,
+      heelStackMm: payload.heelStackMm,
+      forefootStackMm: payload.forefootStackMm,
+      dropMm: payload.dropMm,
+      fitNotes: payload.fitNotes,
+      sourceNotes: payload.sourceNotes,
+    });
+  } else if (!resolvedVariantId) {
+    throw new Error("Unable to resolve spec variant.");
+  }
+
+  revalidatePath("/internal");
+}
+
+export async function deleteSpecVariantAction(formData: FormData) {
+  const db = requireDatabase();
+  const variantId = String(formData.get("variantId") ?? "").trim();
+
+  if (!variantId) {
+    throw new Error("Variant id is required.");
+  }
+
+  const existing = await db.query.shoeSpecVariants.findFirst({
+    where: eq(shoeSpecVariants.id, variantId),
+  });
+
+  if (!existing) {
+    throw new Error("Spec variant not found.");
+  }
+
+  const siblingCount = await db.query.shoeSpecVariants.findMany({
+    where: eq(shoeSpecVariants.releaseId, existing.releaseId),
+    columns: { id: true },
+  });
+
+  if (siblingCount.length <= 1) {
+    throw new Error("A release must keep at least one spec variant.");
+  }
+
+  await db.delete(shoeSpecVariants).where(eq(shoeSpecVariants.id, variantId));
+
+  if (existing.isPrimary) {
+    const nextPrimary = await db.query.shoeSpecVariants.findFirst({
+      where: eq(shoeSpecVariants.releaseId, existing.releaseId),
+    });
+    if (nextPrimary) {
+      await db.update(shoeSpecVariants).set({ isPrimary: true, updatedAt: new Date() }).where(eq(shoeSpecVariants.id, nextPrimary.id));
+      await syncPrimaryVariantShadow(existing.releaseId, {
+        weightOz: nextPrimary.weightOz,
+        heelStackMm: nextPrimary.heelStackMm,
+        forefootStackMm: nextPrimary.forefootStackMm,
+        dropMm: nextPrimary.dropMm,
+        fitNotes: nextPrimary.fitNotes,
+        sourceNotes: nextPrimary.sourceNotes,
+      });
+    }
+  }
+
+  revalidatePath("/internal");
 }
 
 export async function createManualReviewAction(formData: FormData) {

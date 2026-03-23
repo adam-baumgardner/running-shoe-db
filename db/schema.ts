@@ -50,6 +50,13 @@ export const crawlRunStatusEnum = pgEnum("crawl_run_status", [
   "partial",
   "failed",
 ]);
+export const shoeSpecAudienceEnum = pgEnum("shoe_spec_audience", [
+  "mens",
+  "womens",
+  "unisex",
+  "other",
+  "unknown",
+]);
 
 export const brands = pgTable(
   "brands",
@@ -130,6 +137,38 @@ export const shoeSpecs = pgTable(
     sourceNotes: text("source_notes"),
   },
   (table) => [index("shoe_specs_drop_idx").on(table.dropMm)]
+);
+
+export const shoeSpecVariants = pgTable(
+  "shoe_spec_variants",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    releaseId: uuid("release_id")
+      .notNull()
+      .references(() => shoeReleases.id, { onDelete: "cascade" }),
+    variantKey: varchar("variant_key", { length: 80 }).notNull(),
+    displayLabel: varchar("display_label", { length: 80 }).notNull(),
+    audience: shoeSpecAudienceEnum("audience").default("unknown").notNull(),
+    isPrimary: boolean("is_primary").default(false).notNull(),
+    weightOz: numeric("weight_oz", { precision: 4, scale: 1 }),
+    heelStackMm: integer("heel_stack_mm"),
+    forefootStackMm: integer("forefoot_stack_mm"),
+    dropMm: integer("drop_mm"),
+    lugDepthMm: numeric("lug_depth_mm", { precision: 4, scale: 1 }),
+    widthNotes: text("width_notes"),
+    fitNotes: text("fit_notes"),
+    sourceNotes: text("source_notes"),
+    sourceUrl: text("source_url"),
+    sourceLabel: varchar("source_label", { length: 160 }),
+    lastVerifiedAt: timestamp("last_verified_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("shoe_spec_variants_release_idx").on(table.releaseId),
+    index("shoe_spec_variants_drop_idx").on(table.dropMm),
+    uniqueIndex("shoe_spec_variants_release_variant_idx").on(table.releaseId, table.variantKey),
+  ]
 );
 
 export const reviewSources = pgTable(

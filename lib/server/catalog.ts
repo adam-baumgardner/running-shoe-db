@@ -15,9 +15,30 @@ import {
   reviews,
   reviewSources,
   shoeReleases,
+  shoeSpecVariants,
   shoes,
   shoeSpecs,
 } from "@/db/schema";
+
+export interface SpecVariant {
+  id: string;
+  releaseId: string;
+  variantKey: string;
+  displayLabel: string;
+  audience: "mens" | "womens" | "unisex" | "other" | "unknown";
+  isPrimary: boolean;
+  weightOz: number | null;
+  heelStackMm: number | null;
+  forefootStackMm: number | null;
+  dropMm: number | null;
+  lugDepthMm: number | null;
+  widthNotes: string | null;
+  fitNotes: string | null;
+  sourceNotes: string | null;
+  sourceUrl: string | null;
+  sourceLabel: string | null;
+  lastVerifiedAt: string | null;
+}
 
 export interface CatalogCard {
   id: string;
@@ -179,6 +200,10 @@ export interface ShoeDetail {
   dropMm: number | null;
   fitNotes: string | null;
   sourceNotes: string | null;
+  specVariants: SpecVariant[];
+  primarySpecVariant: SpecVariant | null;
+  selectedSpecVariant: SpecVariant | null;
+  showSpecVariantToggle: boolean;
   reviewCount: number;
   averageReviewScore: number | null;
   reviewScore: number | null;
@@ -293,6 +318,12 @@ export interface ComparisonRow extends CatalogCard {
   priceUsd: number | null;
   heelStackMm: number | null;
   forefootStackMm: number | null;
+  weightOz: number | null;
+  dropMm: number | null;
+  specVariants: SpecVariant[];
+  primarySpecVariant: SpecVariant | null;
+  selectedSpecVariant: SpecVariant | null;
+  showSpecVariantToggle: boolean;
   averageReviewScore: number | null;
   reviewCoverage: ShoeDetail["reviewCoverage"];
   aiReviewSummary: ShoeDetail["aiReviewSummary"];
@@ -551,6 +582,9 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       averageReviewScore,
       aiReviewSummary,
     );
+    const specVariantsByReleaseId = await getSpecVariantsByReleaseId([row.id]);
+    const specVariants = specVariantsByReleaseId.get(row.id) ?? [];
+    const primarySpecVariant = getPrimarySpecVariant(specVariants);
 
     return {
       id: row.id,
@@ -569,12 +603,16 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
       isCurrent: row.isCurrent,
       isPlated: row.isPlated,
       foam: row.foam,
-      weightOz: row.weightOzMen ? Number(row.weightOzMen) : null,
-      heelStackMm: row.heelStackMm,
-      forefootStackMm: row.forefootStackMm,
-      dropMm: row.dropMm,
-      fitNotes: row.fitNotes,
-      sourceNotes: row.sourceNotes,
+      weightOz: primarySpecVariant?.weightOz ?? (row.weightOzMen ? Number(row.weightOzMen) : null),
+      heelStackMm: primarySpecVariant?.heelStackMm ?? row.heelStackMm,
+      forefootStackMm: primarySpecVariant?.forefootStackMm ?? row.forefootStackMm,
+      dropMm: primarySpecVariant?.dropMm ?? row.dropMm,
+      fitNotes: primarySpecVariant?.fitNotes ?? row.fitNotes,
+      sourceNotes: primarySpecVariant?.sourceNotes ?? row.sourceNotes,
+      specVariants,
+      primarySpecVariant,
+      selectedSpecVariant: primarySpecVariant,
+      showSpecVariantToggle: hasMenAndWomenVariants(specVariants),
       reviewCount: Number(row.reviewCount),
       averageReviewScore,
       reviewScore: reviewIntelligence.compositeScore,
@@ -593,6 +631,7 @@ export async function getShoeDetail(slug: string): Promise<ShoeDetail | null> {
 export async function getReleaseDetail(
   shoeSlug: string,
   releaseSlug: string,
+  selectedVariantKey?: string | null,
 ): Promise<ShoeDetail | null> {
   if (!process.env.DATABASE_URL) {
     return buildFallbackDetail(shoeSlug);
@@ -685,7 +724,8 @@ export async function getReleaseDetail(
       .where(and(eq(reviews.releaseId, row.id), eq(reviews.status, "approved")))
       .orderBy(desc(reviews.publishedAt));
 
-    return buildShoeDetailFromRow(row, reviewRows);
+    const specVariantsByReleaseId = await getSpecVariantsByReleaseId([row.id]);
+    return buildShoeDetailFromRow(row, reviewRows, specVariantsByReleaseId.get(row.id) ?? [], selectedVariantKey);
   } catch {
     return buildFallbackDetail(shoeSlug);
   }
@@ -1180,15 +1220,21 @@ function getDominantSentiment(weightedSentiment: {
   return sorted[0][0];
 }
 
-export async function getComparisonPageData(selectedSlugs: string[]): Promise<ComparisonPageData> {
-  const rows = await getComparisonRows(selectedSlugs);
+export async function getComparisonPageData(
+  selectedSlugs: string[],
+  selectedVariantKeysByReleaseId: Record<string, string> = {},
+): Promise<ComparisonPageData> {
+  const rows = await getComparisonRows(selectedSlugs, selectedVariantKeysByReleaseId);
   return {
     rows,
     narrative: buildComparisonNarrative(rows),
   };
 }
 
-export async function getComparisonRows(selectedReleaseIds: string[]): Promise<ComparisonRow[]> {
+export async function getComparisonRows(
+  selectedReleaseIds: string[],
+  selectedVariantKeysByReleaseId: Record<string, string> = {},
+): Promise<ComparisonRow[]> {
   const releaseIds = selectedReleaseIds.filter(Boolean).slice(0, 4);
   if (!releaseIds.length) {
     return [];
@@ -1256,11 +1302,16 @@ export async function getComparisonRows(selectedReleaseIds: string[]): Promise<C
       )
       .orderBy(brands.name, shoes.name);
 
+    const specVariantsByReleaseId = await getSpecVariantsByReleaseId(rows.map((row) => row.id));
+
     return rows.map((row) => {
       const reviewCount = Number(row.reviewCount);
       const averageReviewScore = row.averageReviewScore ? Number(row.averageReviewScore) : null;
       const aiReviewSummary = getReleaseAiReviewSummary(row.metadata);
       const reviewIntelligence = buildAggregateReviewIntelligence(reviewCount, averageReviewScore, aiReviewSummary);
+      const specVariants = specVariantsByReleaseId.get(row.id) ?? [];
+      const selectedSpecVariant = resolveSpecVariant(specVariants, selectedVariantKeysByReleaseId[row.id]);
+      const primarySpecVariant = getPrimarySpecVariant(specVariants);
 
       return {
         id: row.id,
@@ -1276,10 +1327,14 @@ export async function getComparisonRows(selectedReleaseIds: string[]): Promise<C
         foam: row.foam,
         rideProfile: buildRideProfile(row.foam, row.isPlated),
         usageSummary: row.usageSummary,
-        weightOz: row.weightOzMen ? Number(row.weightOzMen) : null,
-        heelStackMm: row.heelStackMm,
-        forefootStackMm: row.forefootStackMm,
-        dropMm: row.dropMm,
+        weightOz: selectedSpecVariant?.weightOz ?? (row.weightOzMen ? Number(row.weightOzMen) : null),
+        heelStackMm: selectedSpecVariant?.heelStackMm ?? row.heelStackMm,
+        forefootStackMm: selectedSpecVariant?.forefootStackMm ?? row.forefootStackMm,
+        dropMm: selectedSpecVariant?.dropMm ?? row.dropMm,
+        specVariants,
+        primarySpecVariant,
+        selectedSpecVariant,
+        showSpecVariantToggle: hasMenAndWomenVariants(specVariants),
         reviewCount,
         isPlated: row.isPlated,
         isCurrent: row.isCurrent,
@@ -1403,6 +1458,71 @@ function buildRideProfile(foam: string | null, isPlated: boolean) {
   return parts.join(", ");
 }
 
+async function getSpecVariantsByReleaseId(releaseIds: string[]) {
+  if (!releaseIds.length) {
+    return new Map<string, SpecVariant[]>();
+  }
+
+  const db = getDb();
+  const rows = await db.query.shoeSpecVariants.findMany({
+    where: inArray(shoeSpecVariants.releaseId, releaseIds),
+  });
+
+  const variants = rows
+    .sort((left, right) => {
+      if (left.isPrimary !== right.isPrimary) {
+        return left.isPrimary ? -1 : 1;
+      }
+      return left.displayLabel.localeCompare(right.displayLabel);
+    })
+    .map<SpecVariant>((row) => ({
+    id: row.id,
+    releaseId: row.releaseId,
+    variantKey: row.variantKey,
+    displayLabel: row.displayLabel,
+    audience: row.audience,
+    isPrimary: row.isPrimary,
+    weightOz: row.weightOz ? Number(row.weightOz) : null,
+    heelStackMm: row.heelStackMm,
+    forefootStackMm: row.forefootStackMm,
+    dropMm: row.dropMm,
+    lugDepthMm: row.lugDepthMm ? Number(row.lugDepthMm) : null,
+    widthNotes: row.widthNotes,
+    fitNotes: row.fitNotes,
+    sourceNotes: row.sourceNotes,
+    sourceUrl: row.sourceUrl,
+    sourceLabel: row.sourceLabel,
+    lastVerifiedAt: row.lastVerifiedAt ? row.lastVerifiedAt.toISOString() : null,
+  }));
+
+  const byRelease = new Map<string, SpecVariant[]>();
+  for (const variant of variants) {
+    const current = byRelease.get(variant.releaseId) ?? [];
+    current.push(variant);
+    byRelease.set(variant.releaseId, current);
+  }
+  return byRelease;
+}
+
+function getPrimarySpecVariant(specVariants: SpecVariant[]) {
+  return specVariants.find((variant) => variant.isPrimary) ?? specVariants[0] ?? null;
+}
+
+function resolveSpecVariant(specVariants: SpecVariant[], variantKey?: string | null) {
+  if (variantKey) {
+    const match = specVariants.find((variant) => variant.variantKey === variantKey);
+    if (match) {
+      return match;
+    }
+  }
+  return getPrimarySpecVariant(specVariants);
+}
+
+function hasMenAndWomenVariants(specVariants: SpecVariant[]) {
+  const audiences = new Set(specVariants.map((variant) => variant.audience));
+  return audiences.has("mens") && audiences.has("womens");
+}
+
 function buildFallbackCatalog(): CatalogCard[] {
   return fallbackShoes.map((shoe, index) => {
     const averageReviewScore = 80 + index * 5;
@@ -1466,6 +1586,10 @@ function buildFallbackDetail(slug: string): ShoeDetail | null {
     dropMm: match.dropMm,
     fitNotes: "Neutral fit profile with moderate forefoot room.",
     sourceNotes: "Fallback data from the design seed set.",
+    specVariants: [],
+    primarySpecVariant: null,
+    selectedSpecVariant: null,
+    showSpecVariantToggle: false,
     reviewCount: match.reviewCount,
     averageReviewScore: 82,
     reviewScore: reviewIntelligence.compositeScore,
@@ -1548,6 +1672,12 @@ function buildFallbackComparison(shoes: CatalogCard[]): ComparisonRow[] {
       priceUsd: index === 1 ? 170 : 140,
       heelStackMm: shoe.dropMm ? shoe.dropMm + 28 : null,
       forefootStackMm: 28,
+      weightOz: shoe.weightOz,
+      dropMm: shoe.dropMm,
+      specVariants: [],
+      primarySpecVariant: null,
+      selectedSpecVariant: null,
+      showSpecVariantToggle: false,
       averageReviewScore,
       reviewScore: reviewIntelligence.compositeScore,
       reviewIntelligence,
@@ -1610,6 +1740,8 @@ function buildShoeDetailFromRow(
     sourceUrl: string;
     authorName: string | null;
   }>,
+  specVariants: SpecVariant[] = [],
+  selectedVariantKey?: string | null,
 ): ShoeDetail {
   const mappedReviews = reviewRows.map((review) => ({
     id: review.id,
@@ -1628,6 +1760,8 @@ function buildShoeDetailFromRow(
   const averageReviewScore = row.averageReviewScore ? Number(row.averageReviewScore) : null;
   const aiReviewSummary = getReleaseAiReviewSummary(row.metadata);
   const reviewIntelligence = buildReviewIntelligence(mappedReviews, averageReviewScore, aiReviewSummary);
+  const primarySpecVariant = getPrimarySpecVariant(specVariants);
+  const selectedSpecVariant = resolveSpecVariant(specVariants, selectedVariantKey);
 
   return {
     id: row.id,
@@ -1646,12 +1780,16 @@ function buildShoeDetailFromRow(
     isCurrent: row.isCurrent,
     isPlated: row.isPlated,
     foam: row.foam,
-    weightOz: row.weightOzMen ? Number(row.weightOzMen) : null,
-    heelStackMm: row.heelStackMm,
-    forefootStackMm: row.forefootStackMm,
-    dropMm: row.dropMm,
-    fitNotes: row.fitNotes,
-    sourceNotes: row.sourceNotes,
+    weightOz: selectedSpecVariant?.weightOz ?? (row.weightOzMen ? Number(row.weightOzMen) : null),
+    heelStackMm: selectedSpecVariant?.heelStackMm ?? row.heelStackMm,
+    forefootStackMm: selectedSpecVariant?.forefootStackMm ?? row.forefootStackMm,
+    dropMm: selectedSpecVariant?.dropMm ?? row.dropMm,
+    fitNotes: selectedSpecVariant?.fitNotes ?? row.fitNotes,
+    sourceNotes: selectedSpecVariant?.sourceNotes ?? row.sourceNotes,
+    specVariants,
+    primarySpecVariant,
+    selectedSpecVariant,
+    showSpecVariantToggle: hasMenAndWomenVariants(specVariants),
     reviewCount: Number(row.reviewCount),
     averageReviewScore,
     reviewScore: reviewIntelligence.compositeScore,

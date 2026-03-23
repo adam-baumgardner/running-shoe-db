@@ -9,7 +9,7 @@ import {
   seedReviews,
   seedReviewSources,
   seedShoes,
-  seedSpecs,
+  seedSpecVariants,
 } from "../db/seed-data";
 import {
   brands,
@@ -18,6 +18,7 @@ import {
   reviews,
   reviewSources,
   shoeReleases,
+  shoeSpecVariants,
   shoes,
   shoeSpecs,
 } from "../db/schema";
@@ -106,31 +107,71 @@ async function main() {
     })
   );
 
-  for (const spec of seedSpecs) {
+  for (const spec of seedSpecVariants) {
     const releaseId = releaseIdByKey.get(spec.releaseKey);
     if (!releaseId) throw new Error(`Missing release for spec ${spec.releaseKey}`);
 
-    const existingSpec = await db.query.shoeSpecs.findFirst({
-      where: eq(shoeSpecs.releaseId, releaseId),
+    const variantKey = spec.variantKey ?? "default";
+    const lugDepthValue = spec.lugDepthMm == null ? null : String(spec.lugDepthMm);
+    const existingSpec = await db.query.shoeSpecVariants.findFirst({
+      where: and(eq(shoeSpecVariants.releaseId, releaseId), eq(shoeSpecVariants.variantKey, variantKey)),
     });
 
     if (existingSpec) {
-      await db.update(shoeSpecs).set({
-        weightOzMen: spec.weightOzMen,
+      await db.update(shoeSpecVariants).set({
+        displayLabel: spec.displayLabel ?? "Default",
+        audience: spec.audience ?? "unknown",
+        isPrimary: spec.isPrimary ?? true,
+        weightOz: spec.weightOz,
         heelStackMm: spec.heelStackMm,
         forefootStackMm: spec.forefootStackMm,
         dropMm: spec.dropMm,
+        lugDepthMm: lugDepthValue,
         fitNotes: spec.fitNotes,
-      }).where(eq(shoeSpecs.releaseId, releaseId));
+        sourceNotes: spec.sourceNotes ?? null,
+        sourceUrl: spec.sourceUrl ?? null,
+        sourceLabel: spec.sourceLabel ?? null,
+      }).where(eq(shoeSpecVariants.id, existingSpec.id));
     } else {
-      await db.insert(shoeSpecs).values({
+      await db.insert(shoeSpecVariants).values({
         releaseId,
-        weightOzMen: spec.weightOzMen,
+        variantKey,
+        displayLabel: spec.displayLabel ?? "Default",
+        audience: spec.audience ?? "unknown",
+        isPrimary: spec.isPrimary ?? true,
+        weightOz: spec.weightOz,
         heelStackMm: spec.heelStackMm,
         forefootStackMm: spec.forefootStackMm,
         dropMm: spec.dropMm,
+        lugDepthMm: lugDepthValue,
         fitNotes: spec.fitNotes,
+        sourceNotes: spec.sourceNotes ?? null,
+        sourceUrl: spec.sourceUrl ?? null,
+        sourceLabel: spec.sourceLabel ?? null,
       });
+    }
+
+    if (spec.isPrimary ?? true) {
+      const legacySpec = await db.query.shoeSpecs.findFirst({
+        where: eq(shoeSpecs.releaseId, releaseId),
+      });
+      const legacyValues = {
+        weightOzMen: spec.weightOz,
+        heelStackMm: spec.heelStackMm,
+        forefootStackMm: spec.forefootStackMm,
+        dropMm: spec.dropMm,
+        lugDepthMm: lugDepthValue,
+        fitNotes: spec.fitNotes,
+        sourceNotes: spec.sourceNotes ?? null,
+      };
+      if (legacySpec) {
+        await db.update(shoeSpecs).set(legacyValues).where(eq(shoeSpecs.releaseId, releaseId));
+      } else {
+        await db.insert(shoeSpecs).values({
+          releaseId,
+          ...legacyValues,
+        });
+      }
     }
   }
 

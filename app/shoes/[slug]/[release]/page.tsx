@@ -3,12 +3,14 @@ import { getReleaseDetail, getShoeParentPageData } from "@/lib/server/catalog";
 
 interface ReleaseDetailPageProps {
   params: Promise<{ slug: string; release: string }>;
+  searchParams?: Promise<{ variant?: string }>;
 }
 
-export default async function ReleaseDetailPage({ params }: ReleaseDetailPageProps) {
+export default async function ReleaseDetailPage({ params, searchParams }: ReleaseDetailPageProps) {
   const resolvedParams = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : {};
   const [shoe, parent] = await Promise.all([
-    getReleaseDetail(resolvedParams.slug, resolvedParams.release),
+    getReleaseDetail(resolvedParams.slug, resolvedParams.release, resolvedSearchParams.variant ?? null),
     getShoeParentPageData(resolvedParams.slug),
   ]);
 
@@ -30,6 +32,9 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             <span className="pill">{shoe.stability}</span>
             <span className="pill">{shoe.isPlated ? "Plated" : "Non-plated"}</span>
             <span className="pill">{shoe.reviewCount} reviews</span>
+            {shoe.selectedSpecVariant && shoe.showSpecVariantToggle ? (
+              <span className="pill">{shoe.selectedSpecVariant.displayLabel}</span>
+            ) : null}
           </div>
         </div>
       </section>
@@ -47,6 +52,22 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           </div>
         </div>
         <p>{shoe.aiReviewSummary?.overview ?? shoe.reviewCoverage.summary}</p>
+        {shoe.showSpecVariantToggle ? (
+          <div className="detail-chip-row">
+            {shoe.specVariants
+              .filter((variant) => variant.audience === "mens" || variant.audience === "womens")
+              .map((variant) => (
+                <a
+                  className="text-link text-link--compact"
+                  href={`/shoes/${shoe.slug}/${resolvedParams.release}?variant=${variant.variantKey}`}
+                  key={variant.id}
+                >
+                  {variant.displayLabel}
+                  {shoe.selectedSpecVariant?.variantKey === variant.variantKey ? " selected" : ""}
+                </a>
+              ))}
+          </div>
+        ) : null}
           <dl className="spec-grid spec-grid--wide">
           <div>
             <dt>Release year</dt>

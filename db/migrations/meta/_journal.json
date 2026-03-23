@@ -15,6 +15,13 @@
       "when": 1773248977235,
       "tag": "0001_famous_juggernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774254000000,
+      "tag": "0003_variant_specs",
+      "breakpoints": true
     }
   ]
 }
