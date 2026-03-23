@@ -113,9 +113,15 @@ async function main() {
 
     const variantKey = spec.variantKey ?? "default";
     const lugDepthValue = spec.lugDepthMm == null ? null : String(spec.lugDepthMm);
+    const shouldPromoteLegacyDefault = variantKey === "mens" || variantKey === "unisex";
     const existingSpec = await db.query.shoeSpecVariants.findFirst({
       where: and(eq(shoeSpecVariants.releaseId, releaseId), eq(shoeSpecVariants.variantKey, variantKey)),
     });
+    const legacyDefaultSpec = shouldPromoteLegacyDefault
+      ? await db.query.shoeSpecVariants.findFirst({
+          where: and(eq(shoeSpecVariants.releaseId, releaseId), eq(shoeSpecVariants.variantKey, "default")),
+        })
+      : null;
 
     if (existingSpec) {
       await db.update(shoeSpecVariants).set({
@@ -132,6 +138,26 @@ async function main() {
         sourceUrl: spec.sourceUrl ?? null,
         sourceLabel: spec.sourceLabel ?? null,
       }).where(eq(shoeSpecVariants.id, existingSpec.id));
+
+      if (legacyDefaultSpec && legacyDefaultSpec.id !== existingSpec.id) {
+        await db.delete(shoeSpecVariants).where(eq(shoeSpecVariants.id, legacyDefaultSpec.id));
+      }
+    } else if (legacyDefaultSpec) {
+      await db.update(shoeSpecVariants).set({
+        variantKey,
+        displayLabel: spec.displayLabel ?? "Default",
+        audience: spec.audience ?? "unknown",
+        isPrimary: spec.isPrimary ?? true,
+        weightOz: spec.weightOz,
+        heelStackMm: spec.heelStackMm,
+        forefootStackMm: spec.forefootStackMm,
+        dropMm: spec.dropMm,
+        lugDepthMm: lugDepthValue,
+        fitNotes: spec.fitNotes,
+        sourceNotes: spec.sourceNotes ?? null,
+        sourceUrl: spec.sourceUrl ?? null,
+        sourceLabel: spec.sourceLabel ?? null,
+      }).where(eq(shoeSpecVariants.id, legacyDefaultSpec.id));
     } else {
       await db.insert(shoeSpecVariants).values({
         releaseId,
