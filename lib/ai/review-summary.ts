@@ -194,14 +194,24 @@ async function generateWithOpenAi(
   let response: Response | null = null;
   const maxAttempts = 4;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: requestBody,
-    });
+    try {
+      response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: requestBody,
+        signal: AbortSignal.timeout(45_000),
+      });
+    } catch (error) {
+      if (attempt === maxAttempts) {
+        throw error;
+      }
+
+      await sleep(Math.min(5_000 * attempt, 20_000));
+      continue;
+    }
 
     if (response.ok) {
       break;
