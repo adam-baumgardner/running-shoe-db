@@ -6227,6 +6227,15 @@ export const seedReviews: SeedReview[] = baseSeedReviews.map((review) => {
 
 export const seedCrawlSources: SeedCrawlSource[] = [
   {
+    reviewSourceSlug: "roadtrailrun",
+    importerKey: "roadtrailrun",
+    targetType: "search",
+    targetUrl: "https://www.roadtrailrun.com/",
+    searchPattern: "{brand_name} {shoe_name}",
+    cadenceLabel: "manual",
+    notes: "RoadTrailRun search-backed editorial crawl for targeted release reviews.",
+  },
+  {
     reviewSourceSlug: "believe-in-the-run",
     importerKey: "believe-in-the-run",
     targetType: "search",

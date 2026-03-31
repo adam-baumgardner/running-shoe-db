@@ -1,5 +1,5 @@
 import { config } from "dotenv";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { getDb } from "@/db";
 import { brands, reviewAuthors, reviews, reviewSources, shoeReleases, shoes } from "@/db/schema";
 import { generateReleaseReviewSummary } from "@/lib/ai/review-summary";
@@ -16,11 +16,15 @@ async function main() {
   const limit = limitArg ? Number(limitArg.split("=")[1]) : 50;
   const offsetArg = process.argv.find((arg) => arg.startsWith("--offset="));
   const offset = offsetArg ? Number(offsetArg.split("=")[1]) : 0;
+  const releaseIds = process.argv
+    .filter((arg) => arg.startsWith("--release-id="))
+    .map((arg) => arg.split("=")[1])
+    .filter(Boolean);
   const delayMsArg = process.argv.find((arg) => arg.startsWith("--delay-ms="));
   const delayMs = delayMsArg ? Number(delayMsArg.split("=")[1]) : 1250;
   const db = getDb();
 
-  const releaseRows = await db
+  const baseReleaseQuery = db
     .select({
       id: shoeReleases.id,
       versionName: shoeReleases.versionName,
@@ -34,9 +38,12 @@ async function main() {
     .from(shoeReleases)
     .innerJoin(shoes, eq(shoeReleases.shoeId, shoes.id))
     .innerJoin(brands, eq(shoes.brandId, brands.id))
-    .orderBy(shoeReleases.createdAt)
-    .offset(offset)
-    .limit(limit);
+    .orderBy(shoeReleases.createdAt);
+
+  const releaseRows =
+    releaseIds.length > 0
+      ? await baseReleaseQuery.where(inArray(shoeReleases.id, releaseIds))
+      : await baseReleaseQuery.offset(offset).limit(limit);
 
   let generatedCount = 0;
   let refreshedCount = 0;
@@ -144,6 +151,7 @@ async function main() {
   console.info("AI summary refresh completed", {
     offset,
     limit,
+    releaseIdCount: releaseIds.length,
     generatedCount,
     refreshedCount,
     skippedCount,

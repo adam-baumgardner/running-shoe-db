@@ -4,6 +4,7 @@ import { getDb } from "@/db";
 import { reviewSources, reviews, shoeReleases, shoes } from "@/db/schema";
 import { runBelieveInTheRunImport } from "@/lib/ingestion/believe-in-the-run-runner";
 import { runDoctorsOfRunningImport } from "@/lib/ingestion/doctors-of-running-runner";
+import { runRoadTrailRunImport } from "@/lib/ingestion/roadtrailrun-runner";
 import { runRedditRunningShoeGeeksImport } from "@/lib/ingestion/reddit-running-shoe-geeks-runner";
 import { runRunRepeatImport } from "@/lib/ingestion/runrepeat-runner";
 
@@ -12,9 +13,10 @@ config({ path: process.env.DOTENV_CONFIG_PATH || ".env.local" });
 const TARGET_APPROVED_REVIEW_COUNT = 2;
 const TRUSTED_IMPORTER_KEYS = [
   "runrepeat",
-  "reddit-running-shoe-geeks",
+  "roadtrailrun",
   "doctors-of-running",
   "believe-in-the-run",
+  "reddit-running-shoe-geeks",
 ] as const;
 
 type ImporterKey = (typeof TRUSTED_IMPORTER_KEYS)[number];
@@ -128,6 +130,8 @@ async function runImporter(importerKey: ImporterKey, releaseId: string) {
       return runRunRepeatImport({ releaseId });
     case "reddit-running-shoe-geeks":
       return runRedditRunningShoeGeeksImport({ releaseId });
+    case "roadtrailrun":
+      return runRoadTrailRunImport({ releaseId });
     case "doctors-of-running":
       return runDoctorsOfRunningImport({ releaseId });
     case "believe-in-the-run":
