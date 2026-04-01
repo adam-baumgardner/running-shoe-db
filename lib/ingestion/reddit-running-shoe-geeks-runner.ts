@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import {
   areFingerprintsSimilar,
+  buildSearchAliases,
   buildTitleFingerprint,
   cleanText,
   deriveSentiment,
@@ -269,7 +270,7 @@ function extractRedditCandidates(
   payload: RedditSearchResponse,
   { query, versionName, brandName }: { query: string; versionName: string; brandName: string }
 ) {
-  const normalizedModelPhrase = normalizeSearchText(versionName);
+  const normalizedModelAliases = buildSearchAliases(versionName);
   const normalizedBrand = normalizeSearchText(brandName);
   const normalizedQuery = normalizeSearchText(query);
   const reviewSignals = [
@@ -297,7 +298,7 @@ function extractRedditCandidates(
       const body = normalizeSearchText(post.selftext ?? "");
       const haystack = `${title} ${body}`.trim();
 
-      if (!title.includes(normalizedModelPhrase)) {
+      if (!normalizedModelAliases.some((alias) => title.includes(alias) || body.includes(alias))) {
         return false;
       }
 

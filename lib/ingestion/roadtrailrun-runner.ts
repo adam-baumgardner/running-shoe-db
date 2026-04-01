@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import {
   areFingerprintsSimilar,
+  buildSearchAliases,
   buildTitleFingerprint,
   cleanText,
   deriveSentiment,
@@ -256,7 +257,7 @@ async function discoverRoadTrailRunCandidates({
   const html = await response.text();
   const $ = cheerio.load(html);
   const normalizedBrand = normalizeSearchText(brandName);
-  const normalizedModel = normalizeSearchText(versionName);
+  const normalizedModelAliases = buildSearchAliases(versionName);
   const normalizedQuery = normalizeSearchText(query);
   const seen = new Set<string>();
 
@@ -282,7 +283,7 @@ async function discoverRoadTrailRunCandidates({
       seen.add(sourceUrl);
 
       const haystack = normalizeSearchText(`${title} ${sourceUrl}`);
-      if (!haystack.includes(normalizedBrand) || !haystack.includes(normalizedModel)) {
+      if (!haystack.includes(normalizedBrand) || !normalizedModelAliases.some((alias) => haystack.includes(alias))) {
         return null;
       }
 

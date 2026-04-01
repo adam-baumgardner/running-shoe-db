@@ -70,9 +70,39 @@ export function cleanText(value: string) {
 export function normalizeSearchText(value: string) {
   return value
     .toLowerCase()
+    .replace(/([a-z])([0-9])/g, "$1 $2")
+    .replace(/([0-9])([a-z])/g, "$1 $2")
     .replace(/[^a-z0-9]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function buildSearchAliases(value: string) {
+  const aliases = new Set<string>();
+  const normalized = normalizeSearchText(value);
+
+  if (normalized) {
+    aliases.add(normalized);
+  }
+
+  const raw = value.toLowerCase().trim();
+  const withBoundaries = raw
+    .replace(/([a-z])([0-9])/g, "$1 $2")
+    .replace(/([0-9])([a-z])/g, "$1 $2");
+  const normalizedWithBoundaries = normalizeSearchText(withBoundaries);
+
+  if (normalizedWithBoundaries) {
+    aliases.add(normalizedWithBoundaries);
+  }
+
+  for (const alias of [...aliases]) {
+    const compact = alias.replace(/\s+/g, "");
+    if (compact) {
+      aliases.add(compact);
+    }
+  }
+
+  return [...aliases].filter(Boolean);
 }
 
 export function summarizeParts(parts: Array<string | null | undefined>, maxLength = 420) {

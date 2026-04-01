@@ -20,6 +20,7 @@ import {
   cleanText,
   deriveSentiment,
   extractHighlights,
+  buildSearchAliases,
   normalizeSearchText,
   summarizeParts,
 } from "@/lib/ingestion/review-normalization";
@@ -257,7 +258,7 @@ async function discoverBelieveInTheRunCandidates({
   const entries = allEntries.flat();
 
   const normalizedBrand = normalizeSearchText(brandName);
-  const normalizedModelPhrase = normalizeSearchText(versionName);
+  const normalizedModelPhrases = buildSearchAliases(versionName);
   const normalizedQuery = normalizeSearchText(query);
 
   return entries
@@ -265,7 +266,7 @@ async function discoverBelieveInTheRunCandidates({
     .filter((entry) => {
       const haystack = normalizeSearchText(`${entry.url} ${entry.title}`);
 
-      if (!haystack.includes(normalizedModelPhrase)) {
+      if (!normalizedModelPhrases.some((phrase) => haystack.includes(phrase))) {
         return false;
       }
 
@@ -277,7 +278,7 @@ async function discoverBelieveInTheRunCandidates({
         return false;
       }
 
-      return haystack.includes(normalizedQuery) || haystack.includes(normalizedModelPhrase);
+      return haystack.includes(normalizedQuery) || normalizedModelPhrases.some((phrase) => haystack.includes(phrase));
     })
     .slice(0, 10)
     .map((entry) => ({
@@ -289,7 +290,7 @@ async function discoverBelieveInTheRunCandidates({
         url: entry.url,
         title: entry.title,
         normalizedBrand,
-        normalizedModelPhrase,
+        normalizedModelPhrase: normalizedModelPhrases[0] ?? normalizeSearchText(versionName),
         normalizedQuery,
       }),
     }));
