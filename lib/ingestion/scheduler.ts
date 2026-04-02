@@ -11,6 +11,7 @@ import {
 import { runBelieveInTheRunImport } from "@/lib/ingestion/believe-in-the-run-runner";
 import { runDoctorsOfRunningImport } from "@/lib/ingestion/doctors-of-running-runner";
 import { runRoadTrailRunImport } from "@/lib/ingestion/roadtrailrun-runner";
+import { runRtingsImport } from "@/lib/ingestion/rtings-runner";
 import { runRedditRunningShoeGeeksImport } from "@/lib/ingestion/reddit-running-shoe-geeks-runner";
 import { runRunRepeatImport } from "@/lib/ingestion/runrepeat-runner";
 
@@ -229,6 +230,8 @@ async function runScheduledImporter(importerKey: string, releaseId: string) {
       return runDoctorsOfRunningImport({ releaseId });
     case "roadtrailrun":
       return runRoadTrailRunImport({ releaseId });
+    case "rtings":
+      return runRtingsImport({ releaseId });
     case "runrepeat":
       return runRunRepeatImport({ releaseId });
     default:

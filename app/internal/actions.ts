@@ -6,6 +6,7 @@ import { getDb } from "@/db";
 import { runBelieveInTheRunImport } from "@/lib/ingestion/believe-in-the-run-runner";
 import { runDoctorsOfRunningImport } from "@/lib/ingestion/doctors-of-running-runner";
 import { runRoadTrailRunImport } from "@/lib/ingestion/roadtrailrun-runner";
+import { runRtingsImport } from "@/lib/ingestion/rtings-runner";
 import { runRedditRunningShoeGeeksImport } from "@/lib/ingestion/reddit-running-shoe-geeks-runner";
 import { runRunRepeatImport } from "@/lib/ingestion/runrepeat-runner";
 import { runScheduledIngestion } from "@/lib/ingestion/scheduler";
@@ -992,6 +993,20 @@ export async function runRoadTrailRunCrawlAction(formData: FormData) {
   revalidatePath("/shoes");
 }
 
+export async function runRtingsCrawlAction(formData: FormData) {
+  requireDatabase();
+  const releaseId = String(formData.get("releaseId") ?? "").trim();
+
+  if (!releaseId) {
+    throw new Error("Release is required.");
+  }
+
+  await runRtingsImport({ releaseId });
+
+  revalidatePath("/internal");
+  revalidatePath("/shoes");
+}
+
 export async function runCoverageGapCrawlAction(formData: FormData) {
   requireDatabase();
   const releaseId = String(formData.get("releaseId") ?? "").trim();
@@ -1013,6 +1028,9 @@ export async function runCoverageGapCrawlAction(formData: FormData) {
       break;
     case "roadtrailrun":
       await runRoadTrailRunImport({ releaseId });
+      break;
+    case "rtings":
+      await runRtingsImport({ releaseId });
       break;
     case "doctors-of-running":
       await runDoctorsOfRunningImport({ releaseId });

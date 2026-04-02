@@ -5029,6 +5029,13 @@ export const seedReviewSources: SeedReviewSource[] = [
     siteUrl: "https://www.doctorsofrunning.com",
     baseDomain: "doctorsofrunning.com",
   },
+  {
+    name: "RTINGS",
+    slug: "rtings",
+    sourceType: "editorial",
+    siteUrl: "https://www.rtings.com/running-shoes",
+    baseDomain: "rtings.com",
+  },
 ];
 
 const reviewSourceSiteUrlBySlug = Object.fromEntries(
@@ -5060,6 +5067,11 @@ export const seedReviewAuthors: SeedReviewAuthor[] = [
     sourceSlug: "doctors-of-running",
     displayName: "Doctors of Running",
     profileUrl: "https://www.doctorsofrunning.com",
+  },
+  {
+    sourceSlug: "rtings",
+    displayName: "RTINGS Editorial",
+    profileUrl: "https://www.rtings.com/running-shoes",
   },
 ];
 
@@ -6270,5 +6282,14 @@ export const seedCrawlSources: SeedCrawlSource[] = [
     searchPattern: "{brand_name} {shoe_name}",
     cadenceLabel: "manual",
     notes: "Planned importer for long-form editorial reviews from Doctors of Running.",
+  },
+  {
+    reviewSourceSlug: "rtings",
+    importerKey: "rtings",
+    targetType: "search",
+    targetUrl: "https://www.rtings.com/running-shoes/reviews",
+    searchPattern: "{brand_name} {shoe_name}",
+    cadenceLabel: "manual",
+    notes: "RTINGS direct-slug editorial crawl for mainstream running shoe reviews.",
   },
 ];
