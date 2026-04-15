@@ -84,26 +84,6 @@ export function CatalogFilterBar({ filters, options, activeFilters }: CatalogFil
           <div className="catalog-filter-panel-body">
             <div className="filter-grid filter-grid--catalog">
               <label className="filter-field">
-                <span>Min release year</span>
-                <input
-                  defaultValue={filters.minReleaseYear ?? ""}
-                  name="minReleaseYear"
-                  type="number"
-                  min="2000"
-                  step="1"
-                />
-              </label>
-              <label className="filter-field">
-                <span>Max release year</span>
-                <input
-                  defaultValue={filters.maxReleaseYear ?? ""}
-                  name="maxReleaseYear"
-                  type="number"
-                  min="2000"
-                  step="1"
-                />
-              </label>
-              <label className="filter-field">
                 <span>Category</span>
                 <select defaultValue={filters.category ?? ""} name="category">
                   <option value="">All categories</option>
@@ -128,12 +108,9 @@ export function CatalogFilterBar({ filters, options, activeFilters }: CatalogFil
               <label className="filter-field">
                 <span>Stability</span>
                 <select defaultValue={filters.stability ?? ""} name="stability">
-                  <option value="">All stability</option>
-                  {options.stabilities.map((stability) => (
-                    <option key={stability} value={stability}>
-                      {stability}
-                    </option>
-                  ))}
+                  <option value="">All</option>
+                  <option value="Neutral">Neutral</option>
+                  <option value="Stability">Stability</option>
                 </select>
               </label>
               <label className="filter-field">
@@ -152,16 +129,8 @@ export function CatalogFilterBar({ filters, options, activeFilters }: CatalogFil
                 </select>
               </label>
               <label className="filter-field">
-                <span>Min MSRP</span>
-                <input defaultValue={filters.minPrice ?? ""} name="minPrice" type="number" min="0" step="1" />
-              </label>
-              <label className="filter-field">
                 <span>Max MSRP</span>
                 <input defaultValue={filters.maxPrice ?? ""} name="maxPrice" type="number" min="0" step="1" />
-              </label>
-              <label className="filter-field">
-                <span>Min weight (oz)</span>
-                <input defaultValue={filters.minWeight ?? ""} name="minWeight" type="number" min="0" step="0.1" />
               </label>
               <label className="filter-field">
                 <span>Max weight (oz)</span>
