@@ -44,6 +44,17 @@ export function CatalogFilterBar({ filters, options, activeFilters }: CatalogFil
             <input defaultValue={filters.q ?? ""} name="q" placeholder="Pegasus, daily, plated..." />
           </label>
           <label className="filter-field catalog-toolbar-field">
+            <span>Brand</span>
+            <select defaultValue={filters.brand ?? ""} name="brand">
+              <option value="">All brands</option>
+              {options.brands.map((brand) => (
+                <option key={brand} value={brand}>
+                  {brand}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-field catalog-toolbar-field">
             <span>Sort by</span>
             <select defaultValue={getSortValue(filters)} name="sort">
               <option value="latest">Newest releases</option>
@@ -72,17 +83,6 @@ export function CatalogFilterBar({ filters, options, activeFilters }: CatalogFil
           <summary>Filters</summary>
           <div className="catalog-filter-panel-body">
             <div className="filter-grid filter-grid--catalog">
-              <label className="filter-field">
-                <span>Brand</span>
-                <select defaultValue={filters.brand ?? ""} name="brand">
-                  <option value="">All brands</option>
-                  {options.brands.map((brand) => (
-                    <option key={brand} value={brand}>
-                      {brand}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <label className="filter-field">
                 <span>Min release year</span>
                 <input
