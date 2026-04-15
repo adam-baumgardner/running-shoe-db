@@ -108,6 +108,7 @@ export interface CatalogFilters {
   maxPrice?: string;
   minWeight?: string;
   maxWeight?: string;
+  cushionLevel?: string;
   minHeelStack?: string;
   maxHeelStack?: string;
   minForefootStack?: string;
@@ -2563,6 +2564,7 @@ function filterCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
 
     if (!matchesMinMax(shoe.priceUsd, filters.minPrice, filters.maxPrice)) return false;
     if (!matchesMinMax(shoe.weightOz, filters.minWeight, filters.maxWeight)) return false;
+    if (!matchesCushionLevel(shoe, filters.cushionLevel)) return false;
     if (!matchesMinMax(shoe.heelStackMm, filters.minHeelStack, filters.maxHeelStack)) return false;
     if (!matchesMinMax(shoe.forefootStackMm, filters.minForefootStack, filters.maxForefootStack)) return false;
     if (!matchesMinMax(shoe.dropMm, filters.minDrop, filters.maxDrop)) return false;
@@ -2579,10 +2581,7 @@ function filterCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
 
 function sortCatalog(shoes: CatalogCard[], filters: CatalogFilters) {
   const q = filters.q?.trim();
-  const sortKey = filters.sort ?? (q ? "relevance" : "latest");
-  const direction =
-    filters.direction ??
-    (sortKey === "brand" || sortKey === "category" ? "asc" : "desc");
+  const { sortKey, direction } = resolveCatalogSort(filters, q);
 
   const sorted = [...shoes].sort((left, right) => {
     if (sortKey === "relevance") {
@@ -2654,6 +2653,7 @@ function buildActiveFilterChips(filters: CatalogFilters) {
   if (filters.current === "current") chips.push({ key: "current", label: "Current", value: "Only current models" });
   pushRangeChip(chips, "price", "Price", filters.minPrice, filters.maxPrice, "$");
   pushRangeChip(chips, "weight", "Weight", filters.minWeight, filters.maxWeight, "", " oz");
+  pushIfValue("cushionLevel", "Cushion", filters.cushionLevel ? capitalize(filters.cushionLevel) : "");
   pushRangeChip(chips, "heel-stack", "Heel stack", filters.minHeelStack, filters.maxHeelStack, "", " mm");
   pushRangeChip(
     chips,
@@ -2669,6 +2669,58 @@ function buildActiveFilterChips(filters: CatalogFilters) {
   pushIfValue("minReviewCount", "Min reviews", filters.minReviewCount ? `${filters.minReviewCount}+` : "");
 
   return chips;
+}
+
+function resolveCatalogSort(filters: CatalogFilters, q?: string) {
+  const requestedSort = filters.sort ?? (q ? "relevance" : "latest");
+
+  switch (requestedSort) {
+    case "oldest":
+      return { sortKey: "latest", direction: "asc" as const };
+    case "brand-a-z":
+      return { sortKey: "brand", direction: "asc" as const };
+    case "price-low":
+      return { sortKey: "price", direction: "asc" as const };
+    case "price-high":
+      return { sortKey: "price", direction: "desc" as const };
+    case "weight-light":
+      return { sortKey: "weight", direction: "asc" as const };
+    case "weight-heavy":
+      return { sortKey: "weight", direction: "desc" as const };
+    case "drop-low":
+      return { sortKey: "drop", direction: "asc" as const };
+    case "drop-high":
+      return { sortKey: "drop", direction: "desc" as const };
+    case "review-score":
+      return { sortKey: "review-score", direction: "desc" as const };
+    case "most-reviewed":
+      return { sortKey: "review-count", direction: "desc" as const };
+    default:
+      return {
+        sortKey: requestedSort,
+        direction:
+          filters.direction ??
+          (requestedSort === "brand" || requestedSort === "category" ? "asc" : "desc"),
+      };
+  }
+}
+
+function matchesCushionLevel(shoe: CatalogCard, cushionLevel?: string) {
+  if (!cushionLevel?.trim()) return true;
+
+  const stack = shoe.heelStackMm ?? shoe.forefootStackMm;
+  if (stack === null) return false;
+
+  switch (cushionLevel) {
+    case "low":
+      return stack <= 29;
+    case "moderate":
+      return stack >= 30 && stack <= 35;
+    case "max":
+      return stack >= 36;
+    default:
+      return true;
+  }
 }
 
 function pushRangeChip(

@@ -19,6 +19,7 @@ interface ShoesPageProps {
     maxPrice?: string;
     minWeight?: string;
     maxWeight?: string;
+    cushionLevel?: string;
     minHeelStack?: string;
     maxHeelStack?: string;
     minForefootStack?: string;

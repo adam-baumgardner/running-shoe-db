@@ -21,6 +21,7 @@ const RESET_FILTER_KEYS = new Set([
   "maxPrice",
   "minWeight",
   "maxWeight",
+  "cushionLevel",
   "minHeelStack",
   "maxHeelStack",
   "minForefootStack",
@@ -44,25 +45,18 @@ export function CatalogFilterBar({ filters, options, activeFilters }: CatalogFil
           </label>
           <label className="filter-field catalog-toolbar-field">
             <span>Sort by</span>
-            <select defaultValue={filters.sort ?? "latest"} name="sort">
-              <option value="latest">Latest release</option>
-              <option value="brand">Brand</option>
-              <option value="release-year">Release year</option>
-              <option value="price">MSRP</option>
-              <option value="weight">Weight</option>
-              <option value="heel-stack">Heel stack</option>
-              <option value="forefoot-stack">Forefoot stack</option>
-              <option value="drop">Drop</option>
-              <option value="review-score">Review score</option>
-              <option value="review-count">Review count</option>
-            </select>
-          </label>
-          <label className="filter-field catalog-toolbar-field">
-            <span>Sort Order</span>
-            <select defaultValue={filters.direction ?? ""} name="direction">
-              <option value="">Auto</option>
-              <option value="asc">Ascending</option>
-              <option value="desc">Descending</option>
+            <select defaultValue={getSortValue(filters)} name="sort">
+              <option value="latest">Newest releases</option>
+              <option value="oldest">Oldest releases</option>
+              <option value="brand-a-z">Brand: A to Z</option>
+              <option value="price-low">Price: low to high</option>
+              <option value="price-high">Price: high to low</option>
+              <option value="weight-light">Weight: lightest first</option>
+              <option value="weight-heavy">Weight: heaviest first</option>
+              <option value="drop-low">Drop: lowest first</option>
+              <option value="drop-high">Drop: highest first</option>
+              <option value="review-score">Review score: high to low</option>
+              <option value="most-reviewed">Most reviewed</option>
             </select>
           </label>
           <div className="catalog-toolbar-actions">
@@ -174,44 +168,13 @@ export function CatalogFilterBar({ filters, options, activeFilters }: CatalogFil
                 <input defaultValue={filters.maxWeight ?? ""} name="maxWeight" type="number" min="0" step="0.1" />
               </label>
               <label className="filter-field">
-                <span>Min heel stack</span>
-                <input
-                  defaultValue={filters.minHeelStack ?? ""}
-                  name="minHeelStack"
-                  type="number"
-                  min="0"
-                  step="1"
-                />
-              </label>
-              <label className="filter-field">
-                <span>Max heel stack</span>
-                <input
-                  defaultValue={filters.maxHeelStack ?? ""}
-                  name="maxHeelStack"
-                  type="number"
-                  min="0"
-                  step="1"
-                />
-              </label>
-              <label className="filter-field">
-                <span>Min forefoot stack</span>
-                <input
-                  defaultValue={filters.minForefootStack ?? ""}
-                  name="minForefootStack"
-                  type="number"
-                  min="0"
-                  step="1"
-                />
-              </label>
-              <label className="filter-field">
-                <span>Max forefoot stack</span>
-                <input
-                  defaultValue={filters.maxForefootStack ?? ""}
-                  name="maxForefootStack"
-                  type="number"
-                  min="0"
-                  step="1"
-                />
+                <span>Cushion level</span>
+                <select defaultValue={filters.cushionLevel ?? ""} name="cushionLevel">
+                  <option value="">Any</option>
+                  <option value="low">Low</option>
+                  <option value="moderate">Moderate</option>
+                  <option value="max">Max</option>
+                </select>
               </label>
               <label className="filter-field">
                 <span>Min drop</span>
@@ -220,27 +183,6 @@ export function CatalogFilterBar({ filters, options, activeFilters }: CatalogFil
               <label className="filter-field">
                 <span>Max drop</span>
                 <input defaultValue={filters.maxDrop ?? ""} name="maxDrop" type="number" min="0" step="1" />
-              </label>
-              <label className="filter-field">
-                <span>Min review score</span>
-                <input
-                  defaultValue={filters.minReviewScore ?? ""}
-                  name="minReviewScore"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="1"
-                />
-              </label>
-              <label className="filter-field">
-                <span>Min review count</span>
-                <input
-                  defaultValue={filters.minReviewCount ?? ""}
-                  name="minReviewCount"
-                  type="number"
-                  min="0"
-                  step="1"
-                />
               </label>
             </div>
           </div>
@@ -262,6 +204,25 @@ export function CatalogFilterBar({ filters, options, activeFilters }: CatalogFil
       ) : null}
     </section>
   );
+}
+
+function getSortValue(filters: CatalogFilters) {
+  if (filters.sort && !filters.direction) {
+    return filters.sort;
+  }
+
+  const sort = filters.sort ?? "latest";
+  const direction = filters.direction ?? (sort === "brand" ? "asc" : "desc");
+
+  if (sort === "brand") return "brand-a-z";
+  if (sort === "price") return direction === "asc" ? "price-low" : "price-high";
+  if (sort === "weight") return direction === "asc" ? "weight-light" : "weight-heavy";
+  if (sort === "drop") return direction === "asc" ? "drop-low" : "drop-high";
+  if (sort === "review-score") return "review-score";
+  if (sort === "review-count") return "most-reviewed";
+  if (sort === "release-year" || sort === "latest") return direction === "asc" ? "oldest" : "latest";
+
+  return sort;
 }
 
 function buildFilterRemovalHref(filters: CatalogFilters, filterKey: string) {
