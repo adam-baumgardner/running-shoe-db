@@ -31,7 +31,7 @@ export function ShoeCard({ shoe }: ShoeCardProps) {
         </div>
         <div className="catalog-row-actions">
           <Link className="text-link text-link--compact" href={releaseHref}>
-            Open shoe
+            View Details
           </Link>
           <Link className="text-link text-link--cta text-link--compact" href={`/compare?release=${shoe.id}`}>
             Compare

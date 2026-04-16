@@ -18,6 +18,38 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
     notFound();
   }
 
+  const variantOptions = shoe.specVariants.filter(
+    (variant) => variant.audience === "mens" || variant.audience === "womens",
+  );
+  const hasVariantSwitcher = shoe.showSpecVariantToggle && variantOptions.length > 1;
+  const gistText =
+    shoe.reviewIntelligence.buyerSignal ??
+    shoe.aiReviewSummary?.overview ??
+    shoe.reviewIntelligence.summary ??
+    shoe.usageSummary ??
+    shoe.rideProfile;
+  const bestFor = dedupeList([
+    ...(shoe.aiReviewSummary?.bestFor ?? []),
+    ...shoe.reviewIntelligence.positives,
+  ]).slice(0, 3);
+  const watchOuts = dedupeList([
+    ...(shoe.aiReviewSummary?.watchOuts ?? []),
+    ...shoe.reviewIntelligence.concerns,
+  ]).slice(0, 3);
+  const mostPraised = dedupeList([
+    ...(shoe.aiReviewSummary?.pros ?? []),
+    ...shoe.reviewIntelligence.positives,
+    ...shoe.reviewIntelligence.consensusPoints,
+  ]).slice(0, 3);
+  const commonConcerns = dedupeList([
+    ...(shoe.aiReviewSummary?.cons ?? []),
+    ...shoe.reviewIntelligence.concerns,
+  ]).slice(0, 3);
+  const opinionSplits = dedupeList([
+    ...(shoe.aiReviewSummary?.debates ?? []),
+    ...shoe.reviewIntelligence.debates,
+  ]).slice(0, 3);
+
   return (
     <main className="page-shell detail-shell">
       <section className="hero hero--single">
@@ -32,9 +64,6 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
             <span className="pill">{shoe.stability}</span>
             <span className="pill">{shoe.isPlated ? "Plated" : "Non-plated"}</span>
             <span className="pill">{shoe.reviewCount} reviews</span>
-            {shoe.selectedSpecVariant && shoe.showSpecVariantToggle ? (
-              <span className="pill">{shoe.selectedSpecVariant.displayLabel}</span>
-            ) : null}
           </div>
         </div>
       </section>
@@ -51,24 +80,29 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
             </a>
           </div>
         </div>
-        <p>{shoe.aiReviewSummary?.overview ?? shoe.reviewCoverage.summary}</p>
-        {shoe.showSpecVariantToggle ? (
-          <div className="detail-chip-row">
-            {shoe.specVariants
-              .filter((variant) => variant.audience === "mens" || variant.audience === "womens")
-              .map((variant) => (
-                <a
-                  className="text-link text-link--compact"
-                  href={`/shoes/${shoe.slug}/${resolvedParams.release}?variant=${variant.variantKey}`}
-                  key={variant.id}
-                >
-                  {variant.displayLabel}
-                  {shoe.selectedSpecVariant?.variantKey === variant.variantKey ? " selected" : ""}
-                </a>
-              ))}
+        <p>{shoe.usageSummary ?? shoe.rideProfile}</p>
+        {hasVariantSwitcher ? (
+          <div className="spec-switcher-row" aria-label="Spec variant selector">
+            <span>Showing specs for</span>
+            <div className="segmented-control">
+              {variantOptions.map((variant) => {
+                const isSelected = shoe.selectedSpecVariant?.variantKey === variant.variantKey;
+
+                return (
+                  <a
+                    aria-current={isSelected ? "true" : undefined}
+                    className={`segmented-control-option ${isSelected ? "segmented-control-option--active" : ""}`}
+                    href={`/shoes/${shoe.slug}/${resolvedParams.release}?variant=${variant.variantKey}`}
+                    key={variant.id}
+                  >
+                    {variant.displayLabel}
+                  </a>
+                );
+              })}
+            </div>
           </div>
         ) : null}
-          <dl className="spec-grid spec-grid--wide">
+        <dl className="spec-grid spec-grid--wide">
           <div>
             <dt>Release year</dt>
             <dd>{shoe.releaseYear ?? "Pending"}</dd>
@@ -114,95 +148,14 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
 
       <section className="detail-grid detail-grid--two">
         <article className="detail-panel">
-          <p className="feature-kicker">AI And Review Summary</p>
-          <h2>What reviewers are saying</h2>
-          <p>{shoe.aiReviewSummary?.overview ?? shoe.reviewIntelligence.summary}</p>
-          <p className="detail-muted">{shoe.reviewIntelligence.summary}</p>
-          {shoe.reviewIntelligence.buyerSignal ? (
-            <p className="catalog-copy">{shoe.reviewIntelligence.buyerSignal}</p>
+          <p className="feature-kicker">Key Summary</p>
+          <h2>The gist</h2>
+          <p className="detail-lede">{gistText}</p>
+          {bestFor.length ? (
+            <InsightList title="Best for" items={bestFor} />
           ) : null}
-          <div className="detail-chip-row">
-            <span className="pill">{shoe.reviewCoverage.sourceCount} sources</span>
-            <span className="pill">{shoe.reviewCoverage.reviewCount} reviews</span>
-            {shoe.reviewCoverage.freshestReviewDate ? (
-              <span className="pill">
-                Latest review: {shoe.reviewCoverage.freshestReviewDate}
-              </span>
-            ) : null}
-          </div>
-          {shoe.aiReviewSummary ? (
-            <dl className="spec-grid">
-              <div>
-                <dt>Editorial sentiment</dt>
-                <dd>{shoe.aiReviewSummary.editorialSentiment ?? "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Community sentiment</dt>
-                <dd>{shoe.aiReviewSummary.communitySentiment ?? "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Source alignment</dt>
-                <dd>{shoe.aiReviewSummary.sourceAlignment}</dd>
-              </div>
-              <div>
-                <dt>Pros</dt>
-                <dd>{shoe.aiReviewSummary.pros.join(" ") || "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Cons</dt>
-                <dd>{shoe.aiReviewSummary.cons.join(" ") || "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Best for</dt>
-                <dd>{shoe.aiReviewSummary.bestFor.join(" ") || "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Watch-outs</dt>
-                <dd>{shoe.aiReviewSummary.watchOuts.join(" ") || "Pending"}</dd>
-              </div>
-            </dl>
-          ) : null}
-          {shoe.reviewIntelligence.positives.length || shoe.reviewIntelligence.concerns.length ? (
-            <dl className="spec-grid">
-              <div>
-                <dt>Most common praise</dt>
-                <dd>{shoe.reviewIntelligence.positives.join(" ") || "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Most common complaints</dt>
-                <dd>{shoe.reviewIntelligence.concerns.join(" ") || "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Editorial read</dt>
-                <dd>{shoe.reviewIntelligence.editorialSummary ?? "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Community read</dt>
-                <dd>{shoe.reviewIntelligence.communitySummary ?? "Pending"}</dd>
-              </div>
-              <div>
-                <dt>Source alignment</dt>
-                <dd>{shoe.reviewIntelligence.sourceAlignment}</dd>
-              </div>
-            </dl>
-          ) : null}
-          {shoe.reviewIntelligence.consensusPoints.length ? (
-            <div className="detail-chip-row">
-              {shoe.reviewIntelligence.consensusPoints.map((item) => (
-                <span className="pill" key={item}>
-                  {item}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {shoe.reviewIntelligence.debates.length ? (
-            <div className="detail-chip-row">
-              {shoe.reviewIntelligence.debates.map((item) => (
-                <span className="pill" key={item}>
-                  {item}
-                </span>
-              ))}
-            </div>
+          {watchOuts.length ? (
+            <InsightList title="Watch out for" items={watchOuts} />
           ) : null}
         </article>
 
@@ -246,10 +199,10 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
                   </p>
                   <div className="card-actions">
                     <a className="text-link" href={`/shoes/${shoe.slug}/${release.releaseSlug}`}>
-                      Open shoe
+                      View Details
                     </a>
                     <a className="text-link" href={`/compare?release=${release.id}`}>
-                      Compare shoe
+                      Compare
                     </a>
                   </div>
                 </div>
@@ -259,46 +212,42 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
         </article>
 
         <article className="detail-panel">
-          <p className="feature-kicker">Fit And Notes</p>
-          <h2>What to know before buying</h2>
-          {shoe.reviewIntelligence.buyerSignal ? <p>{shoe.reviewIntelligence.buyerSignal}</p> : null}
-          {shoe.aiReviewSummary?.bestFor.length ? (
-            <div className="detail-chip-row">
-              {shoe.aiReviewSummary.bestFor.map((item) => (
-                <span className="pill" key={item}>
-                  {item}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {shoe.aiReviewSummary?.watchOuts.length ? (
-            <div className="detail-chip-row">
-              {shoe.aiReviewSummary.watchOuts.map((item) => (
-                <span className="pill" key={item}>
-                  {item}
-                </span>
-              ))}
-            </div>
-          ) : null}
-          {shoe.fitNotes ? <p>{shoe.fitNotes}</p> : null}
-          {shoe.notes ? <p>{shoe.notes}</p> : null}
+          <p className="feature-kicker">Reviewer Signal</p>
+          <h2>Review consensus</h2>
+          <p className="detail-lede">{shoe.aiReviewSummary?.overview ?? shoe.reviewIntelligence.summary}</p>
+          <div className="source-read">
+            <span>{buildSourceRead(shoe.reviewIntelligence.sourceAlignment)}</span>
+            <span>
+              {shoe.reviewCoverage.sourceCount} sources · {shoe.reviewCoverage.reviewCount} reviews
+              {shoe.reviewCoverage.freshestReviewDate
+                ? ` · latest ${shoe.reviewCoverage.freshestReviewDate}`
+                : ""}
+            </span>
+          </div>
+          <div className="insight-grid">
+            {mostPraised.length ? <InsightList title="Most praised" items={mostPraised} /> : null}
+            {commonConcerns.length ? <InsightList title="Common concerns" items={commonConcerns} /> : null}
+            {opinionSplits.length ? <InsightList title="Where opinions split" items={opinionSplits} /> : null}
+          </div>
         </article>
 
         <article className="detail-panel">
           <p className="feature-kicker">Reviews</p>
-          <h2>Latest review coverage</h2>
+          <h2>Latest reviews</h2>
           <div className="review-list">
             {shoe.reviews.map((review) => (
               <article key={review.id} className="review-card">
-                <div className="catalog-card-topline">
-                  <span className="pill">{review.sourceType}</span>
+                <div className="review-card-meta">
+                  <strong>{review.sourceName}</strong>
+                  {review.publishedAt ? <span>{review.publishedAt}</span> : null}
+                  <span>{review.sourceType}</span>
                   {review.sentiment ? <span className="pill">{review.sentiment}</span> : null}
                   {review.scoreNormalized100 ? <span className="pill">{review.scoreNormalized100}/100</span> : null}
                 </div>
                 <h3>{review.title ?? "Untitled review"}</h3>
-                <p className="catalog-copy">{review.excerpt ?? "Excerpt pending."}</p>
+                <p className="catalog-copy review-card-excerpt">{review.excerpt ?? "Excerpt pending."}</p>
                 <a className="text-link" href={review.sourceUrl} target="_blank" rel="noreferrer">
-                  Open source review
+                  View Full Review
                 </a>
               </article>
             ))}
@@ -307,4 +256,39 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
       </section>
     </main>
   );
+}
+
+function InsightList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div className="insight-list">
+      <h3>{title}</h3>
+      <ul>
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function dedupeList(items: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const values: string[] = [];
+
+  for (const item of items) {
+    const trimmed = item?.trim();
+    if (!trimmed) continue;
+    const key = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    values.push(trimmed);
+  }
+
+  return values;
+}
+
+function buildSourceRead(alignment: "aligned" | "mixed" | "divergent") {
+  if (alignment === "aligned") return "Editorial and community feedback are aligned.";
+  if (alignment === "divergent") return "Editorial and community feedback diverge in meaningful ways.";
+  return "Editorial and community feedback are somewhat mixed.";
 }
