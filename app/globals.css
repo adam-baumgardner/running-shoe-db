@@ -168,6 +168,13 @@ a {
   margin-top: 1.5rem;
 }
 
+.review-filter-form {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  align-items: end;
+}
+
 .feature-panel {
   padding: 1.5rem;
   border-radius: 1.25rem;
@@ -392,6 +399,10 @@ a {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
+}
+
+.card-actions--footer {
+  margin-top: 1rem;
 }
 
 .button-primary {
@@ -743,6 +754,24 @@ a {
   align-items: start;
 }
 
+.review-source-line {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.review-feed-copy-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.review-feed-copy-grid h3 {
+  margin: 0 0 0.45rem;
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
 .review-card {
   padding: 1rem;
   border: 1px solid var(--line);
@@ -1073,6 +1102,8 @@ a {
   }
 
   .catalog-toolbar-main,
+  .review-filter-form,
+  .review-feed-copy-grid,
   .filter-grid--catalog,
   .spec-grid--wide,
   .catalog-row-primary,

@@ -140,6 +140,7 @@ export interface ReviewsFeedItem {
   category: string;
   sourceName: string;
   sourceType: "editorial" | "reddit" | "user";
+  sourceSlug: string;
   sourceUrl: string;
   title: string | null;
   excerpt: string | null;
@@ -159,9 +160,19 @@ export interface ReviewsFeedData {
   items: ReviewsFeedItem[];
   filterOptions: {
     brands: string[];
+    shoes: Array<{ slug: string; label: string; brand: string }>;
+    releases: Array<{ slug: string; shoeSlug: string; label: string; brand: string }>;
+    sources: Array<{ slug: string; name: string }>;
     categories: string[];
     sourceTypes: Array<"editorial" | "reddit" | "user">;
   };
+}
+
+export interface ReviewsFeedFilters {
+  brand?: string;
+  shoe?: string;
+  release?: string;
+  source?: string;
 }
 
 export interface ShoeReviewSummary {
@@ -1353,12 +1364,15 @@ export async function getComparisonRows(
   }
 }
 
-export async function getReviewsFeedData(): Promise<ReviewsFeedData> {
+export async function getReviewsFeedData(filters: ReviewsFeedFilters = {}): Promise<ReviewsFeedData> {
   if (!process.env.DATABASE_URL) {
     return {
       items: [],
       filterOptions: {
         brands: [],
+        shoes: [],
+        releases: [],
+        sources: [],
         categories: [],
         sourceTypes: ["editorial", "reddit", "user"],
       },
@@ -1377,6 +1391,7 @@ export async function getReviewsFeedData(): Promise<ReviewsFeedData> {
         category: shoes.category,
         sourceName: reviewSources.name,
         sourceType: reviewSources.sourceType,
+        sourceSlug: reviewSources.slug,
         sourceUrl: reviews.sourceUrl,
         title: reviews.title,
         excerpt: reviews.excerpt,
@@ -1395,7 +1410,7 @@ export async function getReviewsFeedData(): Promise<ReviewsFeedData> {
       .where(eq(reviews.status, "approved"))
       .orderBy(desc(reviews.publishedAt), desc(reviews.createdAt));
 
-    const items = rows.map((row) => ({
+    const allItems = rows.map((row) => ({
       reviewIntelligence: buildAggregateReviewIntelligence(
         row.scoreNormalized100 !== null || row.sentiment ? 1 : 0,
         row.scoreNormalized100 !== null ? Number(row.scoreNormalized100) : null,
@@ -1410,6 +1425,7 @@ export async function getReviewsFeedData(): Promise<ReviewsFeedData> {
       category: humanizeCategory(row.category),
       sourceName: row.sourceName,
       sourceType: row.sourceType,
+      sourceSlug: row.sourceSlug,
       sourceUrl: row.sourceUrl,
       title: row.title,
       excerpt: row.excerpt,
@@ -1426,13 +1442,35 @@ export async function getReviewsFeedData(): Promise<ReviewsFeedData> {
       consensusPoints: reviewIntelligence.consensusPoints,
       debates: reviewIntelligence.debates,
     }));
+    const items = filterReviewsFeedItems(allItems, filters);
 
     return {
       items,
       filterOptions: {
-        brands: uniq(items.map((item) => item.brand)),
-        categories: uniq(items.map((item) => item.category)),
-        sourceTypes: uniq(items.map((item) => item.sourceType)) as Array<"editorial" | "reddit" | "user">,
+        brands: uniq(allItems.map((item) => item.brand)),
+        shoes: uniqBy(
+          allItems.map((item) => ({
+            slug: item.shoeSlug,
+            label: item.model,
+            brand: item.brand,
+          })),
+          (item) => item.slug,
+        ),
+        releases: uniqBy(
+          allItems.map((item) => ({
+            slug: item.releaseSlug,
+            shoeSlug: item.shoeSlug,
+            label: item.release,
+            brand: item.brand,
+          })),
+          (item) => `${item.shoeSlug}:${item.slug}`,
+        ),
+        sources: uniqBy(
+          allItems.map((item) => ({ slug: item.sourceSlug, name: item.sourceName })),
+          (item) => item.slug,
+        ),
+        categories: uniq(allItems.map((item) => item.category)),
+        sourceTypes: uniq(allItems.map((item) => item.sourceType)) as Array<"editorial" | "reddit" | "user">,
       },
     };
   } catch {
@@ -1440,11 +1478,24 @@ export async function getReviewsFeedData(): Promise<ReviewsFeedData> {
       items: [],
       filterOptions: {
         brands: [],
+        shoes: [],
+        releases: [],
+        sources: [],
         categories: [],
         sourceTypes: ["editorial", "reddit", "user"],
       },
     };
   }
+}
+
+function filterReviewsFeedItems<T extends ReviewsFeedItem>(items: T[], filters: ReviewsFeedFilters) {
+  return items.filter((item) => {
+    if (filters.brand && item.brand !== filters.brand) return false;
+    if (filters.shoe && item.shoeSlug !== filters.shoe) return false;
+    if (filters.release && item.releaseSlug !== filters.release) return false;
+    if (filters.source && item.sourceSlug !== filters.source) return false;
+    return true;
+  });
 }
 
 function humanizeCategory(category: string) {
@@ -2809,4 +2860,18 @@ function capitalize(value: string) {
 
 function uniq(values: string[]) {
   return [...new Set(values)];
+}
+
+function uniqBy<T>(values: T[], getKey: (value: T) => string) {
+  const seen = new Set<string>();
+  const result: T[] = [];
+
+  for (const value of values) {
+    const key = getKey(value);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(value);
+  }
+
+  return result;
 }

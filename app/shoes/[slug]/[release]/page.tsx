@@ -235,7 +235,7 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
           <p className="feature-kicker">Reviews</p>
           <h2>Latest reviews</h2>
           <div className="review-list">
-            {shoe.reviews.map((review) => (
+            {shoe.reviews.slice(0, 3).map((review) => (
               <article key={review.id} className="review-card">
                 <div className="review-card-meta">
                   <strong>{review.sourceName}</strong>
@@ -252,6 +252,13 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
               </article>
             ))}
           </div>
+          {shoe.reviews.length > 3 ? (
+            <div className="card-actions card-actions--footer">
+              <a className="text-link text-link--cta" href={`/reviews?shoe=${shoe.slug}&release=${resolvedParams.release}`}>
+                View All Reviews
+              </a>
+            </div>
+          ) : null}
         </article>
       </section>
     </main>

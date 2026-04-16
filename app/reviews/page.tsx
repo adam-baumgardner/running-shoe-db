@@ -1,8 +1,13 @@
 import Link from "next/link";
-import { getReviewsFeedData } from "@/lib/server/catalog";
+import { getReviewsFeedData, type ReviewsFeedFilters } from "@/lib/server/catalog";
 
-export default async function ReviewsPage() {
-  const { items } = await getReviewsFeedData();
+interface ReviewsPageProps {
+  searchParams?: Promise<ReviewsFeedFilters>;
+}
+
+export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
+  const filters = (await searchParams) ?? {};
+  const { items, filterOptions } = await getReviewsFeedData(filters);
 
   return (
     <main className="page-shell">
@@ -15,63 +20,108 @@ export default async function ReviewsPage() {
             first, so you can scan what just landed and jump straight into the shoe pages that
             matter.
           </p>
-          <div className="detail-chip-row">
-            <span className="pill">{items.length} reviews</span>
-            <span className="pill">Newest first</span>
-          </div>
         </div>
+      </section>
+
+      <section className="filter-shell" aria-label="Review filters">
+        <form className="review-filter-form" action="/reviews">
+          <label className="filter-field">
+            <span>Brand</span>
+            <select defaultValue={filters.brand ?? ""} name="brand">
+              <option value="">All brands</option>
+              {filterOptions.brands.map((brand) => (
+                <option key={brand} value={brand}>
+                  {brand}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-field">
+            <span>Shoe</span>
+            <select defaultValue={filters.shoe ?? ""} name="shoe">
+              <option value="">All shoes</option>
+              {filterOptions.shoes.map((shoe) => (
+                <option key={shoe.slug} value={shoe.slug}>
+                  {shoe.brand} {shoe.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-field">
+            <span>Release</span>
+            <select defaultValue={filters.release ?? ""} name="release">
+              <option value="">All releases</option>
+              {filterOptions.releases.map((release) => (
+                <option key={`${release.shoeSlug}:${release.slug}`} value={release.slug}>
+                  {release.brand} {release.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-field">
+            <span>Review source</span>
+            <select defaultValue={filters.source ?? ""} name="source">
+              <option value="">All sources</option>
+              {filterOptions.sources.map((source) => (
+                <option key={source.slug} value={source.slug}>
+                  {source.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="catalog-toolbar-actions">
+            <button className="button-primary" type="submit">
+              Apply
+            </button>
+            <Link className="button-secondary" href="/reviews">
+              Reset
+            </Link>
+          </div>
+        </form>
+      </section>
+
+      <section className="catalog-meta">
+        <p>{items.length} reviews match the current view.</p>
       </section>
 
       <section className="review-feed" aria-label="Latest reviews">
         {items.length ? (
           items.map((item) => (
             <article key={item.id} className="detail-panel review-feed-item">
-              <div className="catalog-card-topline">
-                <span className="pill">{item.sourceName}</span>
-                <span className="pill">{item.sourceType}</span>
-                <span className="pill">{item.category}</span>
-                {item.sentiment ? <span className="pill">{item.sentiment}</span> : null}
-                {item.reviewScore ? <span className="pill">Review score {item.reviewScore}/100</span> : null}
-                {item.consensusPoints.length ? <span className="pill">Consensus surfaced</span> : null}
-                {item.debates.length ? <span className="pill">Debates surfaced</span> : null}
-                {item.publishedAt ? <span className="pill">{item.publishedAt}</span> : null}
-              </div>
               <div className="review-feed-header">
                 <div>
                   <p className="feature-kicker">
                     {item.brand} {item.release}
                   </p>
                   <h2>{item.title ?? `${item.brand} ${item.release}`}</h2>
+                  <p className="review-source-line">
+                    {item.sourceName}
+                    {item.authorName ? ` · ${item.authorName}` : ""}
+                    {item.publishedAt ? ` · ${item.publishedAt}` : ""}
+                  </p>
                 </div>
-                <p className="detail-muted">{item.authorName ? `${item.authorName}` : "Source review"}</p>
+                <p className="detail-muted">{item.sourceType}</p>
               </div>
-              <p className="catalog-copy">{item.excerpt ?? "Excerpt pending."}</p>
-              {item.aiOverview ? <p className="detail-muted">{item.aiOverview}</p> : null}
-              {item.buyerSignal ? <p className="detail-muted">{item.buyerSignal}</p> : null}
-              {item.consensusPoints.length ? (
-                <div className="detail-chip-row">
-                  {item.consensusPoints.map((point) => (
-                    <span className="pill" key={point}>
-                      {point}
-                    </span>
-                  ))}
+              <div className="review-feed-copy-grid">
+                <div>
+                  <h3>Source excerpt</h3>
+                  <p className="catalog-copy review-card-excerpt">{item.excerpt ?? "Excerpt pending."}</p>
                 </div>
-              ) : null}
-              {item.debates.length ? (
-                <div className="detail-chip-row">
-                  {item.debates.map((point) => (
-                    <span className="pill" key={point}>
-                      {point}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
+                {item.aiOverview || item.buyerSignal ? (
+                  <div>
+                    <h3>Stride Stack summary</h3>
+                    <p className="catalog-copy review-card-excerpt">
+                      {item.aiOverview ?? item.buyerSignal}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
               <div className="card-actions">
                 <Link className="text-link text-link--cta" href={`/shoes/${item.shoeSlug}/${item.releaseSlug}`}>
-                  Open shoe
+                  View Details
                 </Link>
                 <a className="text-link" href={item.sourceUrl} target="_blank" rel="noreferrer">
-                  Open source review
+                  View Full Review
                 </a>
               </div>
             </article>
