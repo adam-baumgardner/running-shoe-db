@@ -37,6 +37,10 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
           items.map((item) => {
             const sourceText = item.body?.trim() || item.excerpt?.trim() || null;
             const stackSummary = item.aiOverview?.trim() || item.buyerSignal?.trim() || item.excerpt?.trim() || null;
+            const authorName =
+              item.authorName?.trim().toLowerCase() === item.sourceName.trim().toLowerCase()
+                ? null
+                : item.authorName;
 
             return (
               <article key={item.id} className="detail-panel review-feed-item">
@@ -48,7 +52,7 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
                     <h2>{item.title ?? `${item.brand} ${item.release}`}</h2>
                     <p className="review-source-line">
                       {item.sourceName}
-                      {item.authorName ? ` · ${item.authorName}` : ""}
+                      {authorName ? ` · ${authorName}` : ""}
                       {item.publishedAt ? ` · ${item.publishedAt}` : ""}
                     </p>
                   </div>
