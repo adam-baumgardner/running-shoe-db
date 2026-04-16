@@ -1489,10 +1489,17 @@ export async function getReviewsFeedData(filters: ReviewsFeedFilters = {}): Prom
 }
 
 function filterReviewsFeedItems<T extends ReviewsFeedItem>(items: T[], filters: ReviewsFeedFilters) {
+  const releaseBelongsToSelectedShoe =
+    filters.shoe && filters.release
+      ? items.some((item) => item.shoeSlug === filters.shoe && item.releaseSlug === filters.release)
+      : false;
+
   return items.filter((item) => {
     if (filters.brand && item.brand !== filters.brand) return false;
     if (filters.shoe && item.shoeSlug !== filters.shoe) return false;
-    if (filters.release && item.releaseSlug !== filters.release) return false;
+    if (filters.shoe && filters.release && releaseBelongsToSelectedShoe && item.releaseSlug !== filters.release) {
+      return false;
+    }
     if (filters.source && item.sourceSlug !== filters.source) return false;
     return true;
   });

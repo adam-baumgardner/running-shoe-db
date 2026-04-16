@@ -8,6 +8,10 @@ interface ReviewsPageProps {
 export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
   const filters = (await searchParams) ?? {};
   const { items, filterOptions } = await getReviewsFeedData(filters);
+  const visibleReleases = filters.shoe
+    ? filterOptions.releases.filter((release) => release.shoeSlug === filters.shoe)
+    : [];
+  const selectedReleaseIsValid = visibleReleases.some((release) => release.slug === filters.release);
 
   return (
     <main className="page-shell">
@@ -47,17 +51,19 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
               ))}
             </select>
           </label>
-          <label className="filter-field">
-            <span>Release</span>
-            <select defaultValue={filters.release ?? ""} name="release">
-              <option value="">All releases</option>
-              {filterOptions.releases.map((release) => (
-                <option key={`${release.shoeSlug}:${release.slug}`} value={release.slug}>
-                  {release.brand} {release.label}
-                </option>
-              ))}
-            </select>
-          </label>
+          {filters.shoe ? (
+            <label className="filter-field">
+              <span>Release</span>
+              <select defaultValue={selectedReleaseIsValid ? filters.release : ""} name="release">
+                <option value="">All releases</option>
+                {visibleReleases.map((release) => (
+                  <option key={`${release.shoeSlug}:${release.slug}`} value={release.slug}>
+                    {release.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <label className="filter-field">
             <span>Review source</span>
             <select defaultValue={filters.source ?? ""} name="source">
