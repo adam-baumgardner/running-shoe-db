@@ -144,6 +144,7 @@ export interface ReviewsFeedItem {
   sourceUrl: string;
   title: string | null;
   excerpt: string | null;
+  body: string | null;
   sentiment: "positive" | "mixed" | "negative" | null;
   scoreNormalized100: number | null;
   publishedAt: string | null;
@@ -1395,6 +1396,7 @@ export async function getReviewsFeedData(filters: ReviewsFeedFilters = {}): Prom
         sourceUrl: reviews.sourceUrl,
         title: reviews.title,
         excerpt: reviews.excerpt,
+        body: reviews.body,
         sentiment: reviews.sentiment,
         scoreNormalized100: reviews.scoreNormalized100,
         publishedAt: reviews.publishedAt,
@@ -1429,6 +1431,7 @@ export async function getReviewsFeedData(filters: ReviewsFeedFilters = {}): Prom
       sourceUrl: row.sourceUrl,
       title: row.title,
       excerpt: row.excerpt,
+      body: row.body,
       sentiment: row.sentiment,
       scoreNormalized100: row.scoreNormalized100,
       publishedAt: row.publishedAt ? row.publishedAt.toISOString().slice(0, 10) : null,

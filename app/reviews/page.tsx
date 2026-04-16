@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReviewFilterForm } from "@/components/review-filter-form";
 import { getReviewsFeedData, type ReviewsFeedFilters } from "@/lib/server/catalog";
 
 interface ReviewsPageProps {
@@ -8,10 +9,6 @@ interface ReviewsPageProps {
 export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
   const filters = (await searchParams) ?? {};
   const { items, filterOptions } = await getReviewsFeedData(filters);
-  const visibleReleases = filters.shoe
-    ? filterOptions.releases.filter((release) => release.shoeSlug === filters.shoe)
-    : [];
-  const selectedReleaseIsValid = visibleReleases.some((release) => release.slug === filters.release);
 
   return (
     <main className="page-shell">
@@ -28,62 +25,7 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
       </section>
 
       <section className="filter-shell" aria-label="Review filters">
-        <form className="review-filter-form" action="/reviews">
-          <label className="filter-field">
-            <span>Brand</span>
-            <select defaultValue={filters.brand ?? ""} name="brand">
-              <option value="">All brands</option>
-              {filterOptions.brands.map((brand) => (
-                <option key={brand} value={brand}>
-                  {brand}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="filter-field">
-            <span>Shoe</span>
-            <select defaultValue={filters.shoe ?? ""} name="shoe">
-              <option value="">All shoes</option>
-              {filterOptions.shoes.map((shoe) => (
-                <option key={shoe.slug} value={shoe.slug}>
-                  {shoe.brand} {shoe.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {filters.shoe ? (
-            <label className="filter-field">
-              <span>Release</span>
-              <select defaultValue={selectedReleaseIsValid ? filters.release : ""} name="release">
-                <option value="">All releases</option>
-                {visibleReleases.map((release) => (
-                  <option key={`${release.shoeSlug}:${release.slug}`} value={release.slug}>
-                    {release.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <label className="filter-field">
-            <span>Review source</span>
-            <select defaultValue={filters.source ?? ""} name="source">
-              <option value="">All sources</option>
-              {filterOptions.sources.map((source) => (
-                <option key={source.slug} value={source.slug}>
-                  {source.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="catalog-toolbar-actions">
-            <button className="button-primary" type="submit">
-              Apply
-            </button>
-            <Link className="button-secondary" href="/reviews">
-              Reset
-            </Link>
-          </div>
-        </form>
+        <ReviewFilterForm filters={filters} filterOptions={filterOptions} />
       </section>
 
       <section className="catalog-meta">
@@ -92,46 +34,49 @@ export default async function ReviewsPage({ searchParams }: ReviewsPageProps) {
 
       <section className="review-feed" aria-label="Latest reviews">
         {items.length ? (
-          items.map((item) => (
-            <article key={item.id} className="detail-panel review-feed-item">
-              <div className="review-feed-header">
-                <div>
-                  <p className="feature-kicker">
-                    {item.brand} {item.release}
-                  </p>
-                  <h2>{item.title ?? `${item.brand} ${item.release}`}</h2>
-                  <p className="review-source-line">
-                    {item.sourceName}
-                    {item.authorName ? ` · ${item.authorName}` : ""}
-                    {item.publishedAt ? ` · ${item.publishedAt}` : ""}
-                  </p>
-                </div>
-                <p className="detail-muted">{item.sourceType}</p>
-              </div>
-              <div className="review-feed-copy-grid">
-                <div>
-                  <h3>Source excerpt</h3>
-                  <p className="catalog-copy review-card-excerpt">{item.excerpt ?? "Excerpt pending."}</p>
-                </div>
-                {item.aiOverview || item.buyerSignal ? (
+          items.map((item) => {
+            const sourceText = item.body?.trim() || item.excerpt?.trim() || null;
+            const stackSummary = item.aiOverview?.trim() || item.buyerSignal?.trim() || item.excerpt?.trim() || null;
+
+            return (
+              <article key={item.id} className="detail-panel review-feed-item">
+                <div className="review-feed-header">
                   <div>
-                    <h3>Stride Stack summary</h3>
-                    <p className="catalog-copy review-card-excerpt">
-                      {item.aiOverview ?? item.buyerSignal}
+                    <p className="feature-kicker">
+                      {item.brand} {item.release}
+                    </p>
+                    <h2>{item.title ?? `${item.brand} ${item.release}`}</h2>
+                    <p className="review-source-line">
+                      {item.sourceName}
+                      {item.authorName ? ` · ${item.authorName}` : ""}
+                      {item.publishedAt ? ` · ${item.publishedAt}` : ""}
                     </p>
                   </div>
-                ) : null}
-              </div>
-              <div className="card-actions">
-                <Link className="text-link text-link--cta" href={`/shoes/${item.shoeSlug}/${item.releaseSlug}`}>
-                  View Details
-                </Link>
-                <a className="text-link" href={item.sourceUrl} target="_blank" rel="noreferrer">
-                  View Full Review
-                </a>
-              </div>
-            </article>
-          ))
+                  <p className="detail-muted">{item.sourceType}</p>
+                </div>
+                <div className="review-feed-copy-grid">
+                  {stackSummary ? (
+                    <div className="review-stack-summary">
+                      <h3>Stride Stack summary</h3>
+                      <p className="catalog-copy">{stackSummary}</p>
+                    </div>
+                  ) : null}
+                  <div>
+                    <h3>Source review text</h3>
+                    <p className="catalog-copy review-source-excerpt">{sourceText ?? "Source text pending."}</p>
+                  </div>
+                </div>
+                <div className="card-actions">
+                  <Link className="text-link text-link--cta" href={`/shoes/${item.shoeSlug}/${item.releaseSlug}`}>
+                    View Details
+                  </Link>
+                  <a className="text-link" href={item.sourceUrl} target="_blank" rel="noreferrer">
+                    View Full Review
+                  </a>
+                </div>
+              </article>
+            );
+          })
         ) : (
           <article className="detail-panel">
             <p className="feature-kicker">Reviews</p>

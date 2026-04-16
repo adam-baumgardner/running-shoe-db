@@ -83,7 +83,6 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
         <p>{shoe.usageSummary ?? shoe.rideProfile}</p>
         {hasVariantSwitcher ? (
           <div className="spec-switcher-row" aria-label="Spec variant selector">
-            <span>Showing specs for</span>
             <div className="segmented-control">
               {variantOptions.map((variant) => {
                 const isSelected = shoe.selectedSpecVariant?.variantKey === variant.variantKey;
@@ -252,7 +251,7 @@ export default async function ReleaseDetailPage({ params, searchParams }: Releas
               </article>
             ))}
           </div>
-          {shoe.reviews.length > 3 ? (
+          {shoe.reviews.length ? (
             <div className="card-actions card-actions--footer">
               <a className="text-link text-link--cta" href={`/reviews?shoe=${shoe.slug}&release=${resolvedParams.release}`}>
                 View All Reviews
