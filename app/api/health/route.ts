@@ -7,11 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const checks = {
-    publicEnvConfigured: Boolean(
-      process.env.NEXT_PUBLIC_SITE_URL &&
-        process.env.NEXT_PUBLIC_SUPABASE_URL &&
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    ),
+    publicEnvConfigured: Boolean(process.env.NEXT_PUBLIC_SITE_URL),
     internalAuthConfigured: Boolean(
       process.env.INTERNAL_BASIC_AUTH_USERNAME && process.env.INTERNAL_BASIC_AUTH_PASSWORD,
     ),

@@ -10,8 +10,6 @@ This checklist is the shortest safe path to make `codex/rebuild-foundation` the 
 - Deployed `/internal` must load reliably after authentication.
 - Production envs must be set for:
   - `NEXT_PUBLIC_SITE_URL`
-  - `NEXT_PUBLIC_SUPABASE_URL`
-  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   - `DATABASE_URL`
   - `INTERNAL_BASIC_AUTH_USERNAME`
   - `INTERNAL_BASIC_AUTH_PASSWORD`

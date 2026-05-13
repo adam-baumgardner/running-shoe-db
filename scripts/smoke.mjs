@@ -14,18 +14,6 @@ async function main() {
   );
   checkEnv(
     checks,
-    "NEXT_PUBLIC_SUPABASE_URL",
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    "Required for client-side Supabase configuration.",
-  );
-  checkEnv(
-    checks,
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    "Required for client-side Supabase configuration.",
-  );
-  checkEnv(
-    checks,
     "DATABASE_URL",
     process.env.DATABASE_URL,
     "Required for server rendering, internal tooling, and ingestion.",
@@ -119,8 +107,6 @@ function checkEnv(checks, label, value, detailWhenMissing) {
 function isRequiredFailure(label) {
   return [
     "NEXT_PUBLIC_SITE_URL",
-    "NEXT_PUBLIC_SUPABASE_URL",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
     "DATABASE_URL",
     "database",
   ].includes(label);
